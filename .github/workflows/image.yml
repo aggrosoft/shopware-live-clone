@@ -29,6 +29,11 @@ jobs:
           bash -n scripts/entrypoint.sh scripts/image-check.sh
           shellcheck scripts/*.sh
 
+      - name: Test source detection without a live shop
+        run: |
+          php -l scripts/detect-source.php
+          php tests/detect-source-test.php
+
       - uses: docker/setup-buildx-action@v3
 
       - name: Image tags
@@ -60,6 +65,7 @@ jobs:
         run: |
           image="${IMAGE_TAGS%%$'\n'*}"
           docker run --rm "$image" --check-image
+          docker run --rm --entrypoint php -v "$PWD:/test:ro" "$image" /test/tests/detect-source-test.php
           status=0
           docker run --rm "$image" || status=$?
           test "$status" -eq 78

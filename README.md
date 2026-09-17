@@ -2,7 +2,7 @@
 
 Wiederverwendbare Dockware-Basis für Wegwerf-Testkopien von Shopware-Shops auf klassischem Hosting mit SSH-Zugang.
 
-## Aktueller Stand: Schritt 1 — Image und Build
+## Aktueller Stand: Schritt 2 — SSH-Erkennung
 
 Das Repository baut ein gemeinsames Image für alle Shops:
 
@@ -27,6 +27,25 @@ Der Build verwendet ausschließlich `GITHUB_TOKEN`; es sind keine Live-Zugangsda
 5. Erfolgreichen Import persistent markieren. Normale Neustarts behalten den Teststand. Eine neue Kopie entsteht durch eine neue Instanz mit neuen Volumes. Kein Rücksync.
 
 Die Compose-Vorlage und der automatische Import folgen im nächsten Schritt. Die bisherige Leershop-Vorlage bleibt separat.
+
+## Quelle prüfen
+
+Mit den Laufzeitvariablen aus `.env.example` kann das Image jetzt eine Quelle untersuchen:
+
+```bash
+docker run --rm \
+  --env SOURCE_SSH_HOST --env SOURCE_SSH_PORT --env SOURCE_SSH_USER \
+  --env SOURCE_SHOP_PATH --env SOURCE_SSH_PRIVATE_KEY --env SOURCE_SSH_KNOWN_HOSTS \
+  ghcr.io/aggrosoft/shopware-live-clone:main --detect-source
+```
+
+Die Werte müssen zuvor in der aufrufenden Umgebung gesetzt sein; in Coolify später als ENV/Secrets. `SOURCE_SHOP_PATH` zeigt auf den Projektordner mit `composer.lock` und `bin/console`, nicht auf `public`. SSH-Key und geprüfter `known_hosts`-Eintrag dürfen mehrzeilig sein. Der Schlüssel muss ohne interaktive Passphrase verwendbar sein. Der Importer akzeptiert keine unbekannten Hostschlüssel automatisch; bei abweichendem Port ist das bekannte SSH-Format `[host]:port` nötig.
+
+Die Prüfung liest über SSH ein PHP-Skript von stdin; keine Skriptdatei wird auf dem Hosting abgelegt. Sie startet weder Shopware noch den Composer-Autoloader und führt keine DB-Abfragen aus. Benötigt wird zunächst PHP CLI ab 7.4. Das Ergebnis ist JSON mit Shopware-Version, erkannter PHP-Zuordnung, verfügbaren Werkzeugen und Hinweisen auf Dienste. DSNs, Passwörter und private Schlüssel werden nicht ausgegeben. Temporäre SSH-Dateien werden nach Abschluss entfernt. SSH-/PHP-Fehler werden bewusst ohne ungefilterte Remote-Ausgabe gemeldet.
+
+Dies ist eine statische Vorprüfung, keine vollständige Auflösung der Symfony-Konfiguration: literale Werte aus `.env`, `.env.local` und den umgebungsspezifischen Dateien werden berücksichtigt; Interpolation, Multiline-Werte und `.env.local.php` werden als ungeklärt gemeldet. YAML/PHP/XML-Konfiguration wird nur auf Dienstverweise untersucht. `configured: null` bedeutet unbekannt, nicht ausgeschaltet. Ob Elasticsearch/OpenSearch aktiv ist und welche Serverversion läuft, wird erst vor dem eigentlichen Import verifiziert. Server-ENV und in der DB gespeicherte Plugin-Konfiguration bleiben hier ungeprüft. PHP-Handler in bedingten Apache-Blöcken und Overrides im Hosting-Panel können vom statisch gefundenen Wert abweichen.
+
+Die CI prüft die Erkennung mit synthetischen Shopdateien: PHP-Vererbung und Fallback, Konfigurationspriorität, unbekannte Werte, nicht unterstützte PHP-Versionen, Geheimnisfreiheit und das Nicht-Ausführen von Live-Code. Es wurde noch kein echter Hosting-Zugang getestet.
 
 ## Eingaben im fertigen Template
 
