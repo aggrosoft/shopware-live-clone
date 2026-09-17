@@ -35,11 +35,15 @@ docker run -d --name clone-ci-search --network clone-ci --network-alias opensear
 docker run -d --name clone-ci-source --network clone-ci dockware/shopware:6.7.10.0
 wait_healthy() {
     local name=$1
+    local started_checks=0
     for ((attempt=0; attempt<180; attempt++)); do
         if [[ $(docker inspect --format '{{.State.Health.Status}}' "$name") == healthy ]]; then return; fi
         if [[ $(docker inspect --format '{{.State.Running}}' "$name") != true ]]; then docker logs "$name"; return 1; fi
         if [[ $(docker inspect --format '{{.State.Health.Status}}' "$name") == unhealthy ]] && docker exec "$name" test -f /var/www/container.launched; then
-            return 1
+            started_checks=$((started_checks + 1))
+            # Startup may already have exhausted Docker's short CI grace period.
+            # Give newly started FPM and supervisor workers a full minute to settle.
+            if ((started_checks >= 12)); then return 1; fi
         fi
         sleep 5
     done

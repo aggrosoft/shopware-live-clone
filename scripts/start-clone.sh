@@ -19,7 +19,9 @@ if ! pgrep -x mysqld > /dev/null; then sudo rm -f /var/run/mysqld/mysqld.sock.lo
 sudo service mysql start > /dev/null 2>&1
 phase=$(jq -r '.phase' "$data/state.json")
 if [[ $phase == imported ]]; then
-    php "$scripts/configure-clone.php"
+    source_php=$(jq -r '.php.selected' "$data/source-report.json")
+    [[ $source_php =~ ^8\.[2345]$ ]] || { echo 'Unsupported source PHP version.' >&2; exit 1; }
+    "php$source_php" "$scripts/configure-clone.php"
     phase=configured
 fi
 [[ $phase == configured || $phase == ready ]] || { echo 'Incomplete import/configuration. Inspect private clone logs; create fresh volumes to retry.' >&2; exit 1; }
