@@ -2,7 +2,7 @@
 
 Wiederverwendbare Dockware-Basis für Wegwerf-Testkopien von Shopware-Shops auf klassischem Hosting mit SSH-Zugang.
 
-## Aktueller Stand: Schritt 2 — SSH-Erkennung
+## Aktueller Stand: Schritt 3 — Dateikopie und Datenbank-Import
 
 Das Repository baut ein gemeinsames Image für alle Shops:
 
@@ -10,7 +10,7 @@ Das Repository baut ein gemeinsames Image für alle Shops:
 
 Basis ist `dockware/shopware-essentials:1.4.0`: Dockware mit MySQL, Mailfänger und PHP 8.2, 8.3, 8.4 und 8.5, ohne vorinstallierten Shop. Der Build prüft die benötigten Werkzeuge und PHP-Erweiterungen. Die Shopware-Version wird später aus der Quelle übernommen und ist unabhängig vom Image-Tag.
 
-**Der Live-Import ist noch nicht implementiert.** Der normale Containerstart beendet sich daher ausdrücklich mit Status 78. Dieses Image noch nicht als fertigen Testshop in Coolify deployen. Mit `docker run --rm ghcr.io/aggrosoft/shopware-live-clone:main --check-image` lassen sich die Image-Voraussetzungen prüfen. Dies ist keine Prüfung des späteren Shop-Betriebs.
+**Erkennung und Rohimport sind implementiert; automatische lokale Konfiguration und Shopstart fehlen noch.** Der normale Containerstart beendet sich daher ausdrücklich mit Status 78. Dieses Image noch nicht als fertigen Testshop in Coolify deployen. Mit `docker run --rm ghcr.io/aggrosoft/shopware-live-clone:main --check-image` lassen sich die Image-Voraussetzungen prüfen. Dies ist keine Prüfung des späteren Shop-Betriebs.
 
 ## Build und Wiederverwendung
 
@@ -26,7 +26,28 @@ Der Build verwendet ausschließlich `GITHUB_TOKEN`; es sind keine Live-Zugangsda
 4. Erst nach abgeschlossenem Import Webzugriff, Cron und Worker starten. Kopierte wartende Live-Jobs nicht ausführen. Plugins bleiben aktiv; deren übernommene Zugangsdaten können weiterhin Live-Systeme ansprechen. Keine vollständige Sandbox versprechen.
 5. Erfolgreichen Import persistent markieren. Normale Neustarts behalten den Teststand. Eine neue Kopie entsteht durch eine neue Instanz mit neuen Volumes. Kein Rücksync.
 
-Die Compose-Vorlage und der automatische Import folgen im nächsten Schritt. Die bisherige Leershop-Vorlage bleibt separat.
+Die Compose-Vorlage, lokale Konfiguration und der automatische Ablauf beim Start folgen im nächsten Schritt. Die bisherige Leershop-Vorlage bleibt separat.
+
+## Rohimport (noch kein laufender Shop)
+
+`--import-source` nutzt dieselben SSH-Variablen wie `--detect-source`. Es benötigt zwei eigene, frische Docker-Volumes:
+
+| Mount | Inhalt |
+|---|---|
+| `/var/lib/shopware-clone` | Kopierte Shopdateien unter `source/`, redigierter Quellbericht, Importstatus |
+| `/var/lib/mysql` | Dockwares lokale MySQL-Daten, Ziel-DB `shopware_clone` |
+
+Der Import läuft ausschließlich vor dem Dockware-Start. Er prüft SSH/PHP/vendor, startet nur die lokale DB, kopiert Dateien inklusive Plugins, Themes, vendor und Medien und überträgt einen komprimierten SQL-Dump über SSH. Cache, Logs, Sessions, `.git` und `node_modules` werden ausgelassen. Symlinks müssen innerhalb der kopierten Verzeichnisstruktur auflösbar sein; externe/beschädigte Links führen zum Abbruch. Es wird nichts auf der Quelle gelöscht oder installiert. Shopware, Plugin-Code und Composer-Autoloader werden nicht ausgeführt.
+
+DB-Zugänge werden auf der Quelle aus `DATABASE_URL` ermittelt: Server-ENV hat Vorrang, ansonsten werden `.env`-Dateien mit einfachen Variablenreferenzen oder eine statisch geparste Symfony-`.env.local.php` verwendet. Komplexe Ausdrücke, unbekannte DB-Verbindungsoptionen und abweichende APP_ENV-Konfiguration führen zum Abbruch. Es wird keine Quell-PHP-Konfiguration ausgeführt. Das DB-Passwort wird nur in der Umgebung des kurzlebigen DB-Clientprozesses verwendet, nicht als Befehlsargument und nicht im Log. Die Webserver-Konfiguration kann von der SSH-Umgebung abweichen; solche Sonderfälle müssen vor dem ersten echten Import geprüft werden.
+
+Der Dump liest nur die Quelldatenbank, mit `--single-transaction`, `--quick` und ohne Tabellensperren. Nicht-InnoDB-Tabellen werden vorher erkannt und abgelehnt. Während des Imports keine Deployments/Schemaänderungen auf live durchführen. Dateien und Datenbank sind kein gemeinsamer atomarer Snapshot; laufende Dateiänderungen können vom DB-Zeitpunkt abweichen. Der Dump wird komprimiert lokal zwischengespeichert und erst nach erfolgreicher Übertragung restauriert. Speicherplatz für Dateien, komprimierten Dump und Ziel-DB ist nötig. Nach erfolgreichem Restore wird die Dumpdatei entfernt. MySQL/MariaDB-spezifische Collations oder SQL können inkompatibel sein; es findet keine stille Konvertierung statt.
+
+Die Zielverbindung ist fest auf den lokalen MySQL-Socket verdrahtet; die Live-ENV kann sie nicht umleiten. Der Import benötigt eine noch nicht vorhandene lokale DB `shopware_clone`. Ein Lock verhindert parallele Importe. Erfolg wird als `phase: imported, ready: false` markiert. Ein erneuter Aufruf lässt bestehende Daten unverändert. Nach einem Abbruch ist ein neuer Versuch mit frischen Zielvolumes nötig; vorhandene Teilimporte werden nicht automatisch gelöscht. Ein Wechsel der SSH-Quelle überschreibt einen schon importierten Stand ebenfalls nicht.
+
+Der kopierte Shop liegt vorerst außerhalb des Webroots. Cron, Worker und Webserver bleiben in diesem Rohimport-Schritt aus. Das ist keine Änderung des vereinbarten Zielverhaltens: Im fertigen Template starten alle nach lokaler Konfiguration. Live-Queues und Zugangsdaten sind jetzt noch Teil der Rohkopie und dürfen noch nicht ausgeführt werden.
+
+CI: Ein kurzlebiger Container stellt einen synthetischen SSH-Quellshop und eine MySQL-Quelldatenbank bereit. Geprüft werden Hostkey-Ablehnung, Dateikopie (auch Pfade mit Leerzeichen), DB-Restore, unveränderte Quelldaten und der Erhalt späterer Teständerungen bei erneutem Import. Es werden keine echten Shops oder Zugangsdaten verwendet.
 
 ## Quelle prüfen
 

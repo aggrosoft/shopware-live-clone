@@ -9,6 +9,10 @@ LABEL org.opencontainers.image.title="Shopware Live Clone" \
 # Keep clone tooling outside the shop volume so imports cannot overwrite it.
 COPY --chmod=0755 scripts/ /opt/shopware-live-clone/
 
+USER root
+RUN install -d -m 0700 -o dockware -g www-data /var/lib/shopware-clone
+USER dockware
+
 RUN /opt/shopware-live-clone/image-check.sh
 
 ENTRYPOINT ["/bin/bash", "/opt/shopware-live-clone/entrypoint.sh"]
