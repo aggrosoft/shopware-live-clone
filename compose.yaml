@@ -1,0 +1,87 @@
+services:
+  shop:
+    image: ghcr.io/aggrosoft/shopware-live-clone:main
+    restart: unless-stopped
+    networks: [default, backend]
+    environment:
+      SERVICE_URL_SHOP_80: /
+      CLONE_URL: ${SERVICE_URL_SHOP_80}
+      SOURCE_URL: ${SOURCE_URL:?Set the exact live sales-channel URL}
+      SOURCE_SSH_HOST: ${SOURCE_SSH_HOST:?Set SSH host}
+      SOURCE_SSH_PORT: ${SOURCE_SSH_PORT:-22}
+      SOURCE_SSH_USER: ${SOURCE_SSH_USER:?Set SSH user}
+      SOURCE_SSH_PRIVATE_KEY: ${SOURCE_SSH_PRIVATE_KEY:?Set private key}
+      SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:?Set verified host key}
+      SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
+    volumes:
+      - clone_data:/var/lib/shopware-clone
+      - clone_db:/var/lib/mysql
+    depends_on:
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  redis:
+    image: redis:7.4
+    restart: unless-stopped
+    networks: [backend]
+    command: [redis-server, --appendonly, 'yes']
+    volumes:
+      - clone_redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  opensearch:
+    image: opensearchproject/opensearch:2.19.4
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: 'true'
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - clone_opensearch:/usr/share/opensearch/data
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=3s" || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 30
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.28
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: 'false'
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    volumes:
+      - clone_elasticsearch:/usr/share/elasticsearch/data
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fsS "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=3s" || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  clone_data:
+  clone_db:
+  clone_redis:
+  clone_opensearch:
+  clone_elasticsearch:
+
+networks:
+  default:
+  backend:
+    internal: true

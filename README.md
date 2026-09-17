@@ -1,83 +1,97 @@
 # Shopware Live Clone
 
-Wiederverwendbare Dockware-Basis für Wegwerf-Testkopien von Shopware-Shops auf klassischem Hosting mit SSH-Zugang.
+Wegwerf-Testkopien bestehender Shopware-Shops auf Basis von Dockware Essentials 1.4.0.
 
-## Aktueller Stand: Schritt 3 — Dateikopie und Datenbank-Import
+## Verwendung in Coolify
 
-Das Repository baut ein gemeinsames Image für alle Shops:
+1. Neue **Docker Compose**-Ressource anlegen und `compose.yaml` aus diesem Repository einfügen.
+2. Für das private Image `ghcr.io/aggrosoft/shopware-live-clone:main` einen GHCR-Registry-Zugang mit Leserecht hinterlegen.
+3. Die folgenden Variablen setzen. Private Keys nicht ins Repository oder als Build-Argument speichern.
+4. Eine Testdomain für den Service `shop`, Port 80, vergeben. Coolify stellt sie über `SERVICE_URL_SHOP_80` bereit; daraus wird `CLONE_URL`.
+5. Deployen und die Phasen im Containerlog verfolgen. Der erste Import kann bei großen Shops lange dauern.
 
-`ghcr.io/aggrosoft/shopware-live-clone:main`
-
-Basis ist `dockware/shopware-essentials:1.4.0`: Dockware mit MySQL, Mailfänger und PHP 8.2, 8.3, 8.4 und 8.5, ohne vorinstallierten Shop. Der Build prüft die benötigten Werkzeuge und PHP-Erweiterungen. Die Shopware-Version wird später aus der Quelle übernommen und ist unabhängig vom Image-Tag.
-
-**Erkennung und Rohimport sind implementiert; automatische lokale Konfiguration und Shopstart fehlen noch.** Der normale Containerstart beendet sich daher ausdrücklich mit Status 78. Dieses Image noch nicht als fertigen Testshop in Coolify deployen. Mit `docker run --rm ghcr.io/aggrosoft/shopware-live-clone:main --check-image` lassen sich die Image-Voraussetzungen prüfen. Dies ist keine Prüfung des späteren Shop-Betriebs.
-
-## Build und Wiederverwendung
-
-GitHub Actions baut bei einem Push nach `main`, bei `v*`-Tags sowie bei manuellem Start. Pull Requests werden gebaut und geprüft, aber nicht veröffentlicht. Erst nach erfolgreichen Prüfungen wird das Image nach GHCR hochgeladen. Tags sind `main`, `sha-<commit>` und gegebenenfalls der Release-Tag. Zielplattform ist zunächst `linux/amd64` für unseren Hetzner-Server.
-
-Der Build verwendet ausschließlich `GITHUB_TOKEN`; es sind keine Live-Zugangsdaten und kein eigener Build-Server erforderlich. Falls die Organisation Actions oder das Erstellen von Packages einschränkt, muss die entsprechende Repository-Berechtigung freigeschaltet werden. Das Package bleibt zunächst privat. Für den späteren Abruf aus Coolify wird ein Registry-Zugang benötigt.
-
-## Vereinbarter Ablauf für die nächsten Schritte
-
-1. SSH-Verbindung und Quellpfad prüfen; PHP-Zuordnung aus `.htaccess` (gegebenenfalls übergeordneten Verzeichnissen), ansonsten CLI, sowie Shopware und Dienste erkennen. Nicht unterstützte Versionen ausdrücklich melden.
-2. Shopdateien inklusive `vendor`, Plugins, Themes und Medien übernehmen; konsistenten SQL-Dump importieren. Keine Installation oder Updates. Die Quelle wird nicht durch Shopware-CLI-Befehle verändert.
-3. Ziel-DB, Testdomains und lokale Dienste konfigurieren. Redis beziehungsweise kompatibles Elasticsearch/OpenSearch lokal anbinden und Suchindizes neu aufbauen; normale Shop-Mails in den Mailfänger lenken.
-4. Erst nach abgeschlossenem Import Webzugriff, Cron und Worker starten. Kopierte wartende Live-Jobs nicht ausführen. Plugins bleiben aktiv; deren übernommene Zugangsdaten können weiterhin Live-Systeme ansprechen. Keine vollständige Sandbox versprechen.
-5. Erfolgreichen Import persistent markieren. Normale Neustarts behalten den Teststand. Eine neue Kopie entsteht durch eine neue Instanz mit neuen Volumes. Kein Rücksync.
-
-Die Compose-Vorlage, lokale Konfiguration und der automatische Ablauf beim Start folgen im nächsten Schritt. Die bisherige Leershop-Vorlage bleibt separat.
-
-## Rohimport (noch kein laufender Shop)
-
-`--import-source` nutzt dieselben SSH-Variablen wie `--detect-source`. Es benötigt zwei eigene, frische Docker-Volumes:
-
-| Mount | Inhalt |
+| Variable | Inhalt |
 |---|---|
-| `/var/lib/shopware-clone` | Kopierte Shopdateien unter `source/`, redigierter Quellbericht, Importstatus |
-| `/var/lib/mysql` | Dockwares lokale MySQL-Daten, Ziel-DB `shopware_clone` |
+| `SOURCE_SSH_HOST` | Hetzner SSH-Hostname |
+| `SOURCE_SSH_PORT` | Optional, Standard 22 |
+| `SOURCE_SSH_USER` | Hosting-Benutzer |
+| `SOURCE_SSH_PRIVATE_KEY` | Mehrzeiliger privater Schlüssel ohne interaktive Passphrase |
+| `SOURCE_SSH_KNOWN_HOSTS` | Verifizierter SSH-Hostschlüsseleintrag; bei anderem Port im Format `[host]:port` |
+| `SOURCE_SHOP_PATH` | Absoluter Projektordner mit `composer.lock` und `bin/console`, nicht `public` |
+| `SOURCE_URL` | Exakte Haupt-Verkaufskanal-URL der Quelle, einschließlich http/https und gegebenenfalls Unterpfad |
+| `CLONE_URL` | Wird in der Compose-Vorlage aus der Coolify-Domain übernommen |
 
-Der Import läuft ausschließlich vor dem Dockware-Start. Er prüft SSH/PHP/vendor, startet nur die lokale DB, kopiert Dateien inklusive Plugins, Themes, vendor und Medien und überträgt einen komprimierten SQL-Dump über SSH. Cache, Logs, Sessions, `.git` und `node_modules` werden ausgelassen. Symlinks müssen innerhalb der kopierten Verzeichnisstruktur auflösbar sein; externe/beschädigte Links führen zum Abbruch. Es wird nichts auf der Quelle gelöscht oder installiert. Shopware, Plugin-Code und Composer-Autoloader werden nicht ausgeführt.
+Die Testdomain muss von live abweichen. Zusätzliche Verkaufskanäle und HTTP-/HTTPS-Aliase bekommen eindeutige Pfade unter `/__clone/...`. Sprachpfade des Hauptshops bleiben erhalten. Die Zuordnung steht privat unter `/var/lib/shopware-clone/domain-map.json`.
 
-DB-Zugänge werden auf der Quelle aus `DATABASE_URL` ermittelt: Server-ENV hat Vorrang, ansonsten werden `.env`-Dateien mit einfachen Variablenreferenzen oder eine statisch geparste Symfony-`.env.local.php` verwendet. Komplexe Ausdrücke, unbekannte DB-Verbindungsoptionen und abweichende APP_ENV-Konfiguration führen zum Abbruch. Es wird keine Quell-PHP-Konfiguration ausgeführt. Das DB-Passwort wird nur in der Umgebung des kurzlebigen DB-Clientprozesses verwendet, nicht als Befehlsargument und nicht im Log. Die Webserver-Konfiguration kann von der SSH-Umgebung abweichen; solche Sonderfälle müssen vor dem ersten echten Import geprüft werden.
+Die aktuelle Automatisierung unterstützt Shopware 6.6/6.7 mit PHP 8.2–8.5. Sonderkonfigurationen können einen Abbruch mit privatem Fehlerlog erfordern; es werden keine Shopware- oder Plugin-Updates ausgeführt.
 
-Der Dump liest nur die Quelldatenbank, mit `--single-transaction`, `--quick` und ohne Tabellensperren. Nicht-InnoDB-Tabellen werden vorher erkannt und abgelehnt. Während des Imports keine Deployments/Schemaänderungen auf live durchführen. Dateien und Datenbank sind kein gemeinsamer atomarer Snapshot; laufende Dateiänderungen können vom DB-Zeitpunkt abweichen. Der Dump wird komprimiert lokal zwischengespeichert und erst nach erfolgreicher Übertragung restauriert. Speicherplatz für Dateien, komprimierten Dump und Ziel-DB ist nötig. Nach erfolgreichem Restore wird die Dumpdatei entfernt. MySQL/MariaDB-spezifische Collations oder SQL können inkompatibel sein; es findet keine stille Konvertierung statt.
+## Ablauf
 
-Die Zielverbindung ist fest auf den lokalen MySQL-Socket verdrahtet; die Live-ENV kann sie nicht umleiten. Der Import benötigt eine noch nicht vorhandene lokale DB `shopware_clone`. Ein Lock verhindert parallele Importe. Erfolg wird als `phase: imported, ready: false` markiert. Ein erneuter Aufruf lässt bestehende Daten unverändert. Nach einem Abbruch ist ein neuer Versuch mit frischen Zielvolumes nötig; vorhandene Teilimporte werden nicht automatisch gelöscht. Ein Wechsel der SSH-Quelle überschreibt einen schon importierten Stand ebenfalls nicht.
+- Beim ersten Start: Quelle per SSH untersuchen, Dateien inklusive Plugins, Themes, vendor und Medien kopieren; konsistenten InnoDB-Dump lokal importieren.
+- Quellkonfiguration sichern, DB auf den lokalen Socket/Server und Redis-Verbindungen auf lokalen Redis umstellen. Mailer-ENV und Shopware-Mailer-Auswahl werden auf den lokalen Mailfänger gelenkt.
+- Verkaufskanal-Domains ersetzen und die kopierten wartenden Nachrichten entfernen. Als laufend/queued markierte Scheduled Tasks werden zurückgesetzt.
+- Cache, Assets und Themes vorbereiten; lokale Suchindizes bei aktivierter Suche synchron neu aufbauen.
+- Erst danach Dockware, Cron und zwei Queue-Worker starten. Worker verarbeiten `async` und `low_priority`, nicht automatisch die Fehlerqueue.
+- Bei Neustarts: bestehenden Stand starten, ohne Import, Domain-Rewrite, Queue-Leerung oder Index-Neuaufbau. Die Quelle muss dann nicht erreichbar sein.
 
-Der kopierte Shop liegt vorerst außerhalb des Webroots. Cron, Worker und Webserver bleiben in diesem Rohimport-Schritt aus. Das ist keine Änderung des vereinbarten Zielverhaltens: Im fertigen Template starten alle nach lokaler Konfiguration. Live-Queues und Zugangsdaten sind jetzt noch Teil der Rohkopie und dürfen noch nicht ausgeführt werden.
+Plugins bleiben aktiv. Übernommene Plugin-/App-/Payment-/ERP-Zugangsdaten können weiterhin Live-Systeme ansprechen, auch durch Worker. Dieses Template ist keine vollständige Netzwerk-Sandbox. Testshops mit kopierten Kundendaten über Coolify-Zugriffsschutz/VPN absichern.
 
-CI: Ein kurzlebiger Container stellt einen synthetischen SSH-Quellshop und eine MySQL-Quelldatenbank bereit. Geprüft werden Hostkey-Ablehnung, Dateikopie (auch Pfade mit Leerzeichen), DB-Restore, unveränderte Quelldaten und der Erhalt späterer Teständerungen bei erneutem Import. Es werden keine echten Shops oder Zugangsdaten verwendet.
+Die Mailoberfläche ist über `/mailcatcher` erreichbar. Dockware bringt auch `/adminer` und `/logs` mit; der Zugangsschutz muss die gesamte Testdomain abdecken. Datenbank, Redis und Suchserver werden nicht durch Hostports veröffentlicht.
 
-## Quelle prüfen
+## Lokale Dienste
 
-Mit den Laufzeitvariablen aus `.env.example` kann das Image jetzt eine Quelle untersuchen:
+| Dienst | Verwendung |
+|---|---|
+| MySQL in Dockware | Eigene Datenbank `shopware_clone` |
+| Redis 7.4 | Cache/Redis-Verbindungen; getrennte logische DBs für unterschiedliche Quell-DSNs |
+| OpenSearch 2.19.4 | Shops mit OpenSearch-PHP-Client |
+| Elasticsearch 7.17.28 | Unterstützter Elasticsearch-7-PHP-Client |
+| Mailfänger in Dockware | Standard-Mailversand der Kopie |
 
-```bash
-docker run --rm \
-  --env SOURCE_SSH_HOST --env SOURCE_SSH_PORT --env SOURCE_SSH_USER \
-  --env SOURCE_SHOP_PATH --env SOURCE_SSH_PRIVATE_KEY --env SOURCE_SSH_KNOWN_HOSTS \
-  ghcr.io/aggrosoft/shopware-live-clone:main --detect-source
-```
+Beide Suchserver laufen in dieser ersten Compose-Version mit je 512 MB Java-Heap, damit die Quelle erst zur Laufzeit ausgewählt werden kann. Ohne aktive Suche baut der Shop keine Indizes auf. Die Auswahl richtet sich nach dem mitkopierten PHP-Client, nicht nach einer Behauptung, dass alle Serverversionen austauschbar wären. Die drei Zusatzdienste liegen in einem internen Netzwerk pro Stack und haben eigene Volumes. Der Docker-Host benötigt für die Suchserver `vm.max_map_count >= 262144` und ausreichend RAM.
 
-Die Werte müssen zuvor in der aufrufenden Umgebung gesetzt sein; in Coolify später als ENV/Secrets. `SOURCE_SHOP_PATH` zeigt auf den Projektordner mit `composer.lock` und `bin/console`, nicht auf `public`. SSH-Key und geprüfter `known_hosts`-Eintrag dürfen mehrzeilig sein. Der Schlüssel muss ohne interaktive Passphrase verwendbar sein. Der Importer akzeptiert keine unbekannten Hostschlüssel automatisch; bei abweichendem Port ist das bekannte SSH-Format `[host]:port` nötig.
+## Speicher und Wiederholungen
 
-Die Prüfung liest über SSH ein PHP-Skript von stdin; keine Skriptdatei wird auf dem Hosting abgelegt. Sie startet weder Shopware noch den Composer-Autoloader und führt keine DB-Abfragen aus. Benötigt wird zunächst PHP CLI ab 7.4. Das Ergebnis ist JSON mit Shopware-Version, erkannter PHP-Zuordnung, verfügbaren Werkzeugen und Hinweisen auf Dienste. DSNs, Passwörter und private Schlüssel werden nicht ausgegeben. Temporäre SSH-Dateien werden nach Abschluss entfernt. SSH-/PHP-Fehler werden bewusst ohne ungefilterte Remote-Ausgabe gemeldet.
+| Volume | Inhalt |
+|---|---|
+| `clone_data` | Shop unter `source/`, Konfigurationssicherungen, Status und private Logs |
+| `clone_db` | MySQL-Daten |
+| `clone_redis` | Lokaler Redis |
+| `clone_opensearch`, `clone_elasticsearch` | Lokale Indizes |
 
-Dies ist eine statische Vorprüfung, keine vollständige Auflösung der Symfony-Konfiguration: literale Werte aus `.env`, `.env.local` und den umgebungsspezifischen Dateien werden berücksichtigt; Interpolation, Multiline-Werte und `.env.local.php` werden als ungeklärt gemeldet. YAML/PHP/XML-Konfiguration wird nur auf Dienstverweise untersucht. `configured: null` bedeutet unbekannt, nicht ausgeschaltet. Ob Elasticsearch/OpenSearch aktiv ist und welche Serverversion läuft, wird erst vor dem eigentlichen Import verifiziert. Server-ENV und in der DB gespeicherte Plugin-Konfiguration bleiben hier ungeprüft. PHP-Handler in bedingten Apache-Blöcken und Overrides im Hosting-Panel können vom statisch gefundenen Wert abweichen.
+Keine festen externen Volumenamen und keine gemeinsamen Bind-Mounts zwischen Shops verwenden. Für eine frische Kopie eine neue Ressource mit neuen Volumes anlegen; alte Wegwerfkopien samt zugehörigen Volumes anschließend bewusst löschen. Ein fehlgeschlagener Rohimport wird nicht automatisch überschrieben. Nach Fehlern während der lokalen Konfiguration bleibt der Shop gestoppt; Details stehen in den privaten Logs. Nach einem Fehler beim Cache-/Theme-/Index-Aufbau kann ein Neustart diese Vorbereitungen erneut versuchen, ohne neu zu importieren.
 
-Die CI prüft die Erkennung mit synthetischen Shopdateien: PHP-Vererbung und Fallback, Konfigurationspriorität, unbekannte Werte, nicht unterstützte PHP-Versionen, Geheimnisfreiheit und das Nicht-Ausführen von Live-Code. Es wurde noch kein echter Hosting-Zugang getestet.
+## Grenzen des Imports
 
-## Eingaben im fertigen Template
+- SSH-Key und Hostschlüssel werden temporär geschrieben und nach dem Transfer entfernt. Keine Passwörter/DSNs in normalen Logs.
+- Quell-PHP-Konfiguration wird als Daten geparst; Symfony-Standard-`.env.local.php` wird nicht ausgeführt. Unterstützt sind literale dotenv-Werte und einfache Variablenreferenzen. Unbekannte Ausdrücke oder DB-Verbindungsoptionen führen zum Abbruch.
+- Die Quelle benötigt PHP CLI ab 7.4, SSH, rsync sowie mysql/mariadb und das passende Dump-Programm.
+- Nicht-InnoDB-Tabellen werden abgelehnt. Während des Imports keine Schemaänderungen/Deployments auf live durchführen. Dateien und DB sind kein gemeinsamer atomarer Snapshot.
+- Der komprimierte Dump wird lokal zwischengespeichert. Platz für Shopdateien, Dump und Ziel-DB vorsehen. Cache, Logs, Sessions, .git und node_modules werden ausgelassen.
+- Externe/beschädigte Symlinks, mehrere DB-Verbindungen und externes Medien-Storage (z. B. S3) sind noch nicht automatisch unterstützt. Es wird nicht stillschweigend auf die Live-DB oder Live-Buckets zurückgeschrieben.
+- Komplexe PHP/XML-Konfiguration, ungewöhnliche Service-Definitionen, domainabhängige Apps/Lizenzen und Plugins können zusätzliche Anpassungen benötigen. Datenbank-Collations werden nicht still konvertiert.
+- PHP wird aus .htaccess oder der CLI ermittelt. Bedingte Apache-Regeln und Einstellungen ausschließlich im Hosting-Panel können eine andere Web-PHP-Version ergeben.
+- Lokale Konfiguration verarbeitet die üblichen YAML-Paketdateien. Kein allgemeines Versprechen für beliebige Plugin-eigene Datenbank- oder SMTP-Clients.
 
-Geplant: `SOURCE_SSH_HOST`, `SOURCE_SSH_PORT` (Standard 22), `SOURCE_SSH_USER`, `SOURCE_SSH_PRIVATE_KEY`, `SOURCE_SHOP_PATH` und `SOURCE_URL`. SSH-Hostschlüssel müssen verifiziert werden. Die Testdomain kommt aus Coolify. DB-Zugangsdaten werden aus der wirksamen Quellkonfiguration gelesen, nicht zusätzlich von Hand eingetragen.
+## Diagnose
 
-SSH-Zugänge und Live-Daten werden erst zur Laufzeit verwendet und gehören weder ins Repository noch in Image-Layer. `.dockerignore` lässt ausschließlich Dockerfile und unsere Skripte in den Build-Kontext.
+`--check-image` prüft Werkzeuge/PHP, `--detect-source` liefert einen redigierten Quellbericht und `--import-source` führt nur den Rohimport aus. Ohne Argumente läuft der vollständige Ablauf.
 
-## Dockware-Integration
+Private Dateien im Container:
 
-Der eigene Einstiegspunkt liegt außerhalb von `/var/www/html`. Das Essentials-Image vermeidet das Entpacken eines vorinstallierten Shops über eine importierte Kopie. Dockwares Original-Entrypoint liegt weiterhin unter `/entrypoint.sh`.
+- `/var/lib/shopware-clone/source-report.json`
+- `/var/lib/shopware-clone/state.json`
+- `/var/lib/shopware-clone/configure-error.log`
+- `/var/lib/shopware-clone/setup.log`
+- `/var/lib/shopware-clone/worker.log`
+- `/var/lib/shopware-clone/scheduler.log`
 
-Beim Import müssen Erkennung und Konfiguration vor dem Start der Dienste erfolgen. `boot_start.sh` wird von Dockware als eigener `sh`-Prozess ausgeführt: dort gesetzte ENV-Werte werden nicht automatisch an den übergeordneten Entrypoint zurückgegeben. `boot_end.sh` läuft bereits nach dem Start der Dienste und ist deshalb für den ersten Import zu spät. Die eigentliche Orchestrierung gehört in unseren Einstiegspunkt, nicht in einen späten Boot-Hook.
+Original-Konfiguration unter `original-config/` und detaillierte Fehlerlogs können Live-Zugangsdaten enthalten und liegen außerhalb des Webroots. Nicht ungeprüft weitergeben.
 
-Quellen: [Dockware Shopware](https://github.com/dockware/shopware), [Essentials 1.4.0](https://github.com/dockware/shopware/releases/tag/essentials-1.4.0).
+## Build und Tests
+
+GitHub Actions prüft Shell/PHP, Konfigurationsfälle und Compose, baut das Image, testet einen künstlichen SSH/MySQL-Import und führt einen vollständigen Smoke-Test mit einem offiziellen Shopware-6.7.10.0-Demoshop aus. Dieser umfasst OpenSearch, Redis, Storefront, Mailfänger, Worker und Neustart bei abgeschalteter Quelle. Erst danach wird das Image nach GHCR veröffentlicht.
+
+Tags: `main`, `sha-<commit>` und gegebenenfalls Release-Tags. Plattform zunächst linux/amd64. Keine Live-Daten oder Zugangsdaten gelangen in den Image-Build. Es wurde noch kein echter Hetzner-Kundenshop getestet.
+
+Quellen: [Dockware](https://github.com/dockware/shopware), [Shopware](https://github.com/shopware/shopware).

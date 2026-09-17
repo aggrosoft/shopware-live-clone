@@ -13,6 +13,8 @@ if [[ "${1:-}" == "--import-source" && "$#" -eq 1 ]]; then
     exec /opt/shopware-live-clone/import-source.sh
 fi
 
-# Import exists, but domains and service connections are not rewritten yet.
-printf '%s\n' 'Shopware Live Clone: use --detect-source or --import-source. Automatic local configuration is not implemented yet.' >&2
-exit 78
+if [[ $# -ne 0 ]]; then
+    printf '%s\n' 'Unknown argument. Use --check-image, --detect-source, --import-source, or no arguments for automatic startup.' >&2
+    exit 64
+fi
+exec /opt/shopware-live-clone/start-clone.sh

@@ -16,3 +16,5 @@ USER dockware
 RUN /opt/shopware-live-clone/image-check.sh
 
 ENTRYPOINT ["/bin/bash", "/opt/shopware-live-clone/entrypoint.sh"]
+
+HEALTHCHECK --interval=30s --timeout=15s --start-period=30m --retries=5 CMD /opt/shopware-live-clone/healthcheck.sh

@@ -1,0 +1,1 @@
+* * * * * /usr/bin/flock -n /var/lib/shopware-clone/scheduler.lock /opt/shopware-live-clone/run-console.sh scheduled-task:run --time-limit=50 --memory-limit=256M >> /var/lib/shopware-clone/scheduler.log 2>&1
