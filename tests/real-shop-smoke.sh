@@ -73,8 +73,8 @@ wait_healthy clone-ci-target
 docker exec clone-ci-target curl -fsS -o /dev/null -H 'Host: clone.example.org' http://127.0.0.1/
 docker exec clone-ci-target sudo supervisorctl status 'clone-worker:*'
 docker exec clone-ci-target crontab -l
-test "$(docker exec -e MYSQL_PWD=root clone-ci-target mysql --no-defaults -u root -N -B shopware_clone -e "SELECT COUNT(*) FROM messenger_messages WHERE body='LIVE_QUEUE_SENTINEL'")" = 0
-test "$(docker exec -e MYSQL_PWD=root clone-ci-source mysql --no-defaults -u root -N -B shopware -e "SELECT COUNT(*) FROM messenger_messages WHERE body='LIVE_QUEUE_SENTINEL'")" = 1
+test "$(docker exec -e MYSQL_PWD=root clone-ci-target mysql --no-defaults --protocol=TCP -h 127.0.0.1 -u root -N -B shopware_clone -e "SELECT COUNT(*) FROM messenger_messages WHERE body='LIVE_QUEUE_SENTINEL'")" = 0
+test "$(docker exec -e MYSQL_PWD=root clone-ci-source mysql --no-defaults --protocol=TCP -h 127.0.0.1 -u root -N -B shopware -e "SELECT COUNT(*) FROM messenger_messages WHERE body='LIVE_QUEUE_SENTINEL'")" = 1
 docker exec clone-ci-target /opt/shopware-live-clone/run-console.sh mailer:test clone-ci@example.org
 docker exec clone-ci-target curl -fsS http://127.0.0.1:1080/messages | grep -q clone-ci@example.org
 docker exec clone-ci-target sh -c 'printf retained > /var/lib/shopware-clone/source/clone-ci-marker'
