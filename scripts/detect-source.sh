@@ -8,7 +8,9 @@ fail() { printf '%s\n' "$1" >&2; exit 64; }
 [[ ${SOURCE_SSH_HOST:-} =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]*$ ]] || fail 'Set SOURCE_SSH_HOST to the SSH hostname or IPv4 address.'
 [[ ${SOURCE_SSH_USER:-} =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$ ]] || fail 'Set SOURCE_SSH_USER to the hosting SSH user.'
 port=${SOURCE_SSH_PORT:-22}
-[[ $port =~ ^[0-9]{1,5}$ ]] && (( 10#$port > 0 && 10#$port <= 65535 )) || fail 'Invalid SOURCE_SSH_PORT.'
+if ! [[ $port =~ ^[0-9]{1,5}$ ]] || ! (( 10#$port > 0 && 10#$port <= 65535 )); then
+    fail 'Invalid SOURCE_SSH_PORT.'
+fi
 [[ ${SOURCE_SHOP_PATH:-} == /* && $SOURCE_SHOP_PATH != *$'\n'* ]] || fail 'SOURCE_SHOP_PATH must be an absolute shop directory.'
 [[ -n ${SOURCE_SSH_PRIVATE_KEY:-} ]] || fail 'Set SOURCE_SSH_PRIVATE_KEY (multiline, unencrypted private key).'
 [[ -n ${SOURCE_SSH_KNOWN_HOSTS:-} ]] || fail 'Set SOURCE_SSH_KNOWN_HOSTS to the verified SSH host key entry.'
