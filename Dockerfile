@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1
 FROM dockware/shopware-essentials:1.4.0
 
+# Dockware unpacks NVM in its own entrypoint. Import scripts run before that.
+ENV BASH_ENV=/dev/null
+
 LABEL org.opencontainers.image.title="Shopware Live Clone" \
       org.opencontainers.image.description="Dockware runtime for disposable copies of existing Shopware shops" \
       org.opencontainers.image.source="https://github.com/aggrosoft/shopware-live-clone"

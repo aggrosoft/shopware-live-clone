@@ -45,6 +45,7 @@ clone_ssh_init
 printf '%s\n' 'Inspecting source...'
 if ! clone_ssh "php -d display_errors=0 -d log_errors=0 -- '$clone_encoded_path'" \
     < "$script_dir/detect-source.php" > "$clone_tmp/result.json" 2> "$clone_tmp/error"; then
+    cp "$clone_tmp/error" "$clone_data/transfer-error.log"
     clone_fail 'Source inspection failed; no data imported.'
 fi
 jq -e '.schema_version == 1 and .php.supported_by_image == true and .shopware.vendor_present == true' \
@@ -72,6 +73,7 @@ if ! rsync --archive --no-owner --no-group --protect-args \
     -e "ssh -F $clone_tmp/config" \
     "clone-source:${SOURCE_SHOP_PATH%/}/" "$clone_source/" \
     > /dev/null 2> "$clone_tmp/error"; then
+    cp "$clone_tmp/error" "$clone_data/transfer-error.log"
     clone_fail 'File transfer failed; check path, SSH/rsync and available disk space.'
 fi
 [[ -f $clone_source/composer.lock && -f $clone_source/vendor/autoload.php && -f $clone_source/bin/console ]] \
@@ -84,6 +86,7 @@ fi
 printf '%s\n' 'Creating a transactional source dump over SSH...'
 if ! clone_ssh "php -d display_errors=0 -d log_errors=0 -- '$clone_encoded_path'" \
     < "$script_dir/source-database.php" 2> "$clone_tmp/error" | gzip -1 > "$clone_archive"; then
+    cp "$clone_tmp/error" "$clone_data/transfer-error.log"
     clone_fail 'Source dump failed. Check DATABASE_URL, dump privileges, InnoDB tables and disk space.'
 fi
 gzip -t "$clone_archive" 2> "$clone_tmp/error" || clone_fail 'Incomplete compressed database dump.'

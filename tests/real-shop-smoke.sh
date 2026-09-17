@@ -7,7 +7,12 @@ cleanup() {
     local result=$?
     if [[ $result != 0 ]]; then
         docker logs clone-ci-target 2>&1 | tail -n 100 || true
-        docker exec clone-ci-target sh -c 'tail -n 100 /var/lib/shopware-clone/setup.log /var/lib/shopware-clone/configure-error.log /var/lib/shopware-clone/worker.log 2>/dev/null' || true
+        for log in setup.log configure-error.log worker.log transfer-error.log; do
+            if docker cp "clone-ci-target:/var/lib/shopware-clone/$log" "$fixture/$log" 2>/dev/null; then
+                tail -n 100 "$fixture/$log"
+                rm -f "$fixture/$log"
+            fi
+        done
     fi
     # Exact, task-owned ephemeral containers; no user resources exist on this CI runner.
     docker rm -f -v clone-ci-target clone-ci-source clone-ci-redis clone-ci-search >/dev/null 2>&1 || true
@@ -37,6 +42,8 @@ wait_healthy() {
 wait_healthy clone-ci-source
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/key"
 docker exec -i -u dockware clone-ci-source sh -c 'cat >> /var/www/.ssh/authorized_keys; chmod 600 /var/www/.ssh/authorized_keys' < "$fixture/key.pub"
+docker exec clone-ci-source sudo chmod 755 /var/www
+docker exec clone-ci-source sudo chmod 700 /var/www/.ssh
 host_key=$(docker exec clone-ci-source cat /etc/ssh/ssh_host_ed25519_key.pub)
 docker cp scripts/source-database.php clone-ci-source:/tmp/source-database.php
 docker cp tests/prepare-real-source.php clone-ci-source:/tmp/prepare-real-source.php
