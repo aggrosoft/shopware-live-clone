@@ -25,6 +25,8 @@ clone_ssh_init() {
         'BatchMode yes' 'IdentitiesOnly yes' 'IdentityAgent none' \
         'ConnectTimeout 15' 'ServerAliveInterval 15' 'ServerAliveCountMax 2' \
         'LogLevel ERROR' > "$clone_tmp/config"
+    # Used by the scripts sourcing this library.
+    # shellcheck disable=SC2034
     clone_encoded_path=$(printf '%s' "$SOURCE_SHOP_PATH" | base64 -w0)
 }
 
