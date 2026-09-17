@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+*.sql
+*.sql.*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+known_hosts
+/data/
+/backups/

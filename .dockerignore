@@ -1,0 +1,5 @@
+# Explicit allowlist: source credentials, dumps and shop files never enter the build.
+**
+!Dockerfile
+!scripts/
+!scripts/**
