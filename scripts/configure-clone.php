@@ -20,7 +20,16 @@ function cloneDomainMap(array $rows, string $source, string $target): array
     $sourcePath = rtrim($sourceParts['path'] ?? '', '/');
     $result = [];
     foreach ($rows as $row) {
-        $old = cloneUrl($row['url']);
+        $candidate = $row['url'];
+        if (strpos($candidate, '://') === false && preg_match('~^[a-zA-Z0-9.-]+(?::[0-9]+)?(?:/.*)?$~', $candidate)) {
+            $candidate = $sourceParts['scheme'] . '://' . $candidate;
+        }
+        try { $old = cloneUrl($candidate); }
+        catch (RuntimeException $error) {
+            // Placeholder/legacy domains also receive a local URL; never keep a live fallback.
+            $result[] = ['id' => $row['id'], 'source' => $row['url'], 'target' => $target . '/__clone/domain-' . substr(hash('sha256', (string) $row['id']), 0, 12)];
+            continue;
+        }
         $parts = parse_url($old);
         $origin = $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '');
         $path = rtrim($parts['path'] ?? '', '/');

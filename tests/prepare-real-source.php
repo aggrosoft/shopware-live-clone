@@ -13,5 +13,6 @@ file_put_contents($root . '/.env.local.php', '<?php return ' . var_export($env, 
 if (!is_dir($root . '/config/packages/prod')) { mkdir($root . '/config/packages/prod', 0770, true); }
 file_put_contents($root . '/config/packages/prod/ci-redis.yaml', "framework:\n  cache:\n    app: cache.adapter.redis\n    default_redis_provider: '%env(REDIS_URL)%'\n");
 $pdo = new PDO('mysql:host=127.0.0.1;dbname=shopware', 'root', 'root', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+echo 'Fixture domains: ' . json_encode($pdo->query('SELECT url FROM sales_channel_domain')->fetchAll(PDO::FETCH_COLUMN)) . "\n";
 $pdo->exec("INSERT INTO messenger_messages (body, headers, queue_name, created_at, available_at) VALUES ('LIVE_QUEUE_SENTINEL','{}','default', NOW(), NOW())");
 echo "Prepared CI source with search, Redis and a live queue sentinel.\n";
