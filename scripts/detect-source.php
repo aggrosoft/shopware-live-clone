@@ -138,7 +138,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__ || ($_SERVER['SCRIP
         echo json_encode(inspectShop($path), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . PHP_EOL;
     } catch (Throwable $error) {
         // Never print exception details: config parsing errors can contain credentials.
-        fwrite(STDERR, "Shopware source inspection failed.\n");
+        file_put_contents('php://stderr', "Shopware source inspection failed.\n");
         exit(1);
     }
 }

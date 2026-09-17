@@ -7,6 +7,8 @@ cleanup() {
     local result=$?
     if [[ $result != 0 ]]; then
         docker logs clone-ci-target 2>&1 | tail -n 100 || true
+        docker inspect --format '{{json .State.Health}}' clone-ci-target || true
+        docker exec clone-ci-target sh -c 'sudo supervisorctl status; tail -n 40 /var/lib/shopware-clone/source/var/log/*.log /var/log/apache2/error.log 2>/dev/null' || true
         for log in setup.log configure-error.log worker.log transfer-error.log; do
             if docker cp "clone-ci-target:/var/lib/shopware-clone/$log" "$fixture/$log" 2>/dev/null; then
                 tail -n 100 "$fixture/$log"
@@ -34,6 +36,9 @@ wait_healthy() {
     for ((attempt=0; attempt<180; attempt++)); do
         if [[ $(docker inspect --format '{{.State.Health.Status}}' "$name") == healthy ]]; then return; fi
         if [[ $(docker inspect --format '{{.State.Running}}' "$name") != true ]]; then docker logs "$name"; return 1; fi
+        if [[ $(docker inspect --format '{{.State.Health.Status}}' "$name") == unhealthy ]] && docker exec "$name" test -f /var/www/container.launched; then
+            return 1
+        fi
         sleep 5
     done
     docker logs "$name"
