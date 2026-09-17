@@ -119,7 +119,7 @@ function databaseConnection(array $env): array
 
 function dbProcess(array $command, array $environment, bool $stream = false): string
 {
-    $descriptor = [0 => ['file', '/dev/null', 'r'], 1 => $stream ? STDOUT : ['pipe', 'w'], 2 => ['file', '/dev/null', 'a']];
+    $descriptor = [0 => ['file', '/dev/null', 'r'], 1 => $stream ? ['file', 'php://stdout', 'w'] : ['pipe', 'w'], 2 => ['file', '/dev/null', 'a']];
     $process = proc_open($command, $descriptor, $pipes, null, $environment);
     if (!is_resource($process)) { throw new RuntimeException('Database client failed.'); }
     $output = '';
@@ -158,7 +158,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__ || ($_SERVER['SCRIP
         if ($root === false || $root === '' || $root[0] !== '/') { throw new RuntimeException('Invalid source path.'); }
         dumpSource($root);
     } catch (Throwable $error) {
-        fwrite(STDERR, "Source database dump failed: check configuration, client tools, privileges and transactional tables.\n");
+        file_put_contents('php://stderr', "Source database dump failed: check configuration, client tools, privileges and transactional tables.\n");
         exit(1);
     }
 }

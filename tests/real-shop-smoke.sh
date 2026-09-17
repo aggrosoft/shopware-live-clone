@@ -48,6 +48,7 @@ host_key=$(docker exec clone-ci-source cat /etc/ssh/ssh_host_ed25519_key.pub)
 docker cp scripts/source-database.php clone-ci-source:/tmp/source-database.php
 docker cp tests/prepare-real-source.php clone-ci-source:/tmp/prepare-real-source.php
 docker exec clone-ci-source php /tmp/prepare-real-source.php
+docker exec clone-ci-source php -r 'require "/tmp/source-database.php"; dumpSource("/var/www/html");' > /dev/null
 
 export SOURCE_SSH_PRIVATE_KEY
 SOURCE_SSH_PRIVATE_KEY=$(< "$fixture/key")
