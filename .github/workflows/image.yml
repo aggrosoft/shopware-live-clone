@@ -24,6 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Make room for the disposable shop integration test
+        run: |
+          # Only unused SDKs on this fresh GitHub-hosted runner; no shop volumes.
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet
+          df -h /
+
       - name: Check shell scripts
         run: |
           for script in scripts/*.sh tests/*.sh; do bash -n "$script"; done

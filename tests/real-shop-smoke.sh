@@ -6,6 +6,8 @@ fixture=$(mktemp -d)
 cleanup() {
     local result=$?
     if [[ $result != 0 ]]; then
+        df -h /
+        docker logs clone-ci-search 2>&1 | tail -n 30 || true
         docker logs clone-ci-target 2>&1 | tail -n 100 || true
         docker inspect --format '{{json .State.Health}}' clone-ci-target || true
         docker exec clone-ci-target sh -c 'sudo supervisorctl status; tail -n 40 /var/lib/shopware-clone/source/var/log/*.log /var/log/apache2/error.log 2>/dev/null' || true

@@ -15,6 +15,9 @@ $check(count(array_unique(array_column($mapped, 'target'))) === 4, 'Aliases and 
 $check(strpos($mapped[3]['target'], 'https://test.example.org/__clone/') === 0, 'Secondary channel stays on target host.');
 $subpath = cloneDomainMap([['id' => '1', 'url' => 'https://live.example.org/shop'], ['id' => '2', 'url' => 'https://live.example.org/shop/en']], 'https://live.example.org/shop', 'https://test.example.org');
 $check($subpath[1]['target'] === 'https://test.example.org/en', 'Source subdirectory stripped.');
+$legacy = cloneDomainMap([['id' => '1', 'url' => 'localhost'], ['id' => '2', 'url' => ''], ['id' => '3', 'url' => '%env(APP_URL)%']], 'http://localhost', 'https://test.example.org');
+$check($legacy[0]['target'] === 'https://test.example.org', 'Scheme-less legacy main domain mapped.');
+$check(count(array_unique(array_column($legacy, 'target'))) === 3, 'Placeholder domains receive distinct local URLs.');
 foreach (['https://user@host', 'https://user:pass@host', 'file:///tmp/test', 'https://host?x=1'] as $url) {
     $rejected = false;
     try { cloneUrl($url); } catch (RuntimeException $expected) { $rejected = true; }
