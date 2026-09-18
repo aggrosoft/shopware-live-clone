@@ -19,6 +19,10 @@ cleanup() {
     local status=$?
     (( BASH_SUBSHELL == 0 )) || return "$status"
     clone_progress_stop
+    if (( status != 0 )) && [[ -n ${clone_tmp:-} && -s $clone_tmp/error ]]; then
+        cp "$clone_tmp/error" "$clone_data/import-error.log"
+        printf '%s\n' 'Error details saved: /var/lib/shopware-clone/import-error.log' >&2
+    fi
     if [[ $clone_started == 1 && $clone_success != 1 ]]; then
         printf '%s\n' '{"schema_version":1,"phase":"failed","ready":false}' > "$clone_data/state.json"
         printf '%s\n' 'Import failed. No shop services were started. Use fresh clone and DB volumes before retrying.' >&2
@@ -116,7 +120,7 @@ local_mysql -e 'CREATE DATABASE shopware_clone CHARACTER SET utf8mb4 COLLATE utf
     2> "$clone_tmp/error" || clone_fail 'Could not create the local clone database.'
 # --binary-mode disables mysql client commands in the input dump.
 clone_progress_start "[5/7] Executing SQL in local database"
-if ! gzip -dc "$clone_archive" | local_mysql --binary-mode=1 shopware_clone > /dev/null 2> "$clone_tmp/error"; then
+if ! { gzip -dc "$clone_archive" | local_mysql --binary-mode=1 shopware_clone > /dev/null; } 2> "$clone_tmp/error"; then
     clone_fail 'Local restore failed (for example an incompatible source collation). No shop services were started.'
 fi
 clone_progress_done

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-for executable in bash ssh rsync mysql mysqldump jq gzip flock sudo timeout base64; do
+for executable in bash ssh rsync mysql mysqldump jq gzip flock sudo timeout base64 rclone; do
     command -v "$executable" >/dev/null || {
         printf 'Missing runtime tool: %s\n' "$executable" >&2
         exit 1

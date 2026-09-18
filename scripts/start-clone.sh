@@ -9,8 +9,24 @@ scripts=/opt/shopware-live-clone
 source "$scripts/progress.sh"
 trap clone_progress_stop EXIT
 [[ -n ${CLONE_URL:-} && -n ${SOURCE_URL:-} ]] || { echo 'Set CLONE_URL (Coolify target URL) and SOURCE_URL.' >&2; exit 78; }
+startup_exit() {
+    local status=$?
+    clone_progress_stop
+    (( status != 0 && BASH_SUBSHELL == 0 )) || return "$status"
+    trap - EXIT
+    rm -f /var/www/container.launched
+    printf 'Startup failed (exit %s). Container stays available for diagnosis; shop, cron and workers were not started.\n' "$status" >&2
+    printf '%s\n' 'Open the Coolify terminal. Error logs: /var/lib/shopware-clone/*error.log and /var/lib/shopware-clone/setup.log' >&2
+    printf '%s\n' "$status" > "$data/startup-failed"
+    trap 'kill "$hold_pid" 2>/dev/null || true; exit 0' TERM INT
+    sleep infinity &
+    hold_pid=$!
+    wait "$hold_pid"
+}
+trap startup_exit EXIT
 exec 8> "$data/startup.lock"
 flock -n 8 || { echo 'A clone startup is already running.' >&2; exit 1; }
+rm -f "$data/startup-failed"
 rm -f /var/www/container.launched
 
 if [[ ! -f $data/state.json ]] || jq -e '.phase == "failed"' "$data/state.json" >/dev/null; then

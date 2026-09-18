@@ -13,6 +13,7 @@ LABEL org.opencontainers.image.title="Shopware Live Clone" \
 COPY --chmod=0755 scripts/ /opt/shopware-live-clone/
 
 USER root
+RUN apt-get update && apt-get install -y --no-install-recommends rclone && rm -rf /var/lib/apt/lists/*
 RUN install -d -m 0700 -o dockware -g www-data /var/lib/shopware-clone
 USER dockware
 

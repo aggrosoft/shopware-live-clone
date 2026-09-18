@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/source-database.php';
+require_once __DIR__ . '/storage-clone.php';
 
 function cloneUrl(string $url): string
 {
@@ -93,12 +94,7 @@ function configureClone(): void
             $effective = array_replace_recursive($effective, $parsed, $parsed['when@prod'] ?? []);
         }
     }
-    // Importing an S3 backend requires copying those objects first, not writing to live.
-    foreach ($effective['shopware']['filesystem'] ?? [] as $storage) {
-        if (is_array($storage) && isset($storage['type']) && $storage['type'] !== 'local') {
-            throw new RuntimeException('External media storage detected. Copying that storage is not supported yet.');
-        }
-    }
+    $storageOverrides = cloneImportStorage($effective, $env, $root, $data);
     $bool = static function ($value) use ($env): bool {
         if (is_string($value) && preg_match('/^%env\((?:bool:)?([A-Z0-9_]+)\)%$/', $value, $m)) { $value = $env[$m[1]] ?? ''; }
         if (!in_array($value, [true, false, 1, 0, '1', '0', 'true', 'false', '', null], true)) { throw new RuntimeException('Unresolved search enable flag.'); }
@@ -142,6 +138,7 @@ function configureClone(): void
         'MESSENGER_TRANSPORT_FAILURE_DSN' => 'doctrine://default?auto_setup=false&queue_name=failed',
         'LOCK_DSN' => 'flock',
     ];
+    $overrides = array_replace($storageOverrides, $overrides);
     // Expose rewritten Redis variables to hardcoded ENV references as well.
     foreach ($env as $key => $value) {
         if (is_string($value) && strpos($value, 'redis://redis:6379/') === 0) { $overrides[$key] = $value; }
@@ -158,6 +155,14 @@ function configureClone(): void
         foreach (['', 'when@prod'] as $scope) {
             if ($scope === '') { $section =& $config; } else { $section =& $config[$scope]; }
             if (!is_array($section)) { unset($section); continue; }
+            foreach (array_keys(cloneLocalFilesystems()) as $filesystem) {
+                unset($section['shopware']['filesystem'][$filesystem]);
+            }
+            if (isset($section['shopware']['filesystem']) && $section['shopware']['filesystem'] === []) { unset($section['shopware']['filesystem']); }
+            if (isset($section['shopware']['cdn'])) {
+                $section['shopware']['cdn']['url'] = '';
+                $section['shopware']['cdn']['fastly']['api_key'] = '';
+            }
             if (isset($section['doctrine']['dbal'])) {
                 $connections = $section['doctrine']['dbal']['connections'] ?? [];
                 if (array_diff(array_keys($connections), ['default'])) { throw new RuntimeException('Additional database connections require separate imports.'); }
@@ -189,7 +194,7 @@ function configureClone(): void
     file_put_contents($data . '/runtime.sh', $runtimeShell);
     $extra = [
         'framework' => ['trusted_proxies' => 'REMOTE_ADDR', 'trusted_headers' => ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-port'], 'mailer' => ['dsn' => 'smtp://127.0.0.1:1025'], 'session' => ['handler_id' => null]],
-        'shopware' => ['cdn' => ['url' => ''], 'admin_worker' => ['enable_admin_worker' => false]],
+        'shopware' => ['filesystem' => cloneLocalFilesystems(), 'cdn' => ['url' => '', 'fastly' => ['api_key' => '']], 'admin_worker' => ['enable_admin_worker' => false]],
     ];
     if (isset($packages['shopware/elasticsearch'])) {
         $extra['elasticsearch'] = ['hosts' => $endpoint, 'enabled' => $search, 'indexing_enabled' => $search, 'index_prefix' => 'clone', 'index_settings' => ['number_of_replicas' => 0], 'administration' => ['hosts' => $endpoint, 'enabled' => $adminSearch, 'index_prefix' => 'clone-admin', 'index_settings' => ['number_of_replicas' => 0]]];

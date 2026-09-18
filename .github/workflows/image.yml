@@ -39,6 +39,7 @@ jobs:
         run: |
           php -l scripts/progress.php
           php -l scripts/anonymize-clone.php
+          php -l scripts/storage-clone.php
           php -l scripts/check-rsync-error.php
           python3 tests/progress-test.py
           php -l scripts/detect-source.php
@@ -96,6 +97,8 @@ jobs:
           status=0
           docker run --rm "$image" || status=$?
           test "$status" -eq 78
+          bash tests/failure-mode.sh "$image"
+          docker run --rm --entrypoint bash -v "$PWD:/test:ro" "$image" /test/tests/storage-integration.sh
 
       - name: Real Shopware first boot and restart
         env:
