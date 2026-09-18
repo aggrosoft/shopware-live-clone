@@ -15,13 +15,13 @@ function cloneStorageValue($value, array $env, string $root)
     return str_replace('%kernel.project_dir%', $root, $value);
 }
 
-function cloneLocalFilesystems(): array
+function cloneLocalFilesystems(string $url): array
 {
     $result = [];
     foreach (['public' => 'public', 'private' => 'files', 'temp' => 'var', 'theme' => 'public', 'asset' => 'public', 'sitemap' => 'public'] as $name => $directory) {
         $result[$name] = ['type' => 'local', 'config' => ['root' => '%kernel.project_dir%/' . $directory]];
         if ($name !== 'temp') { $result[$name]['visibility'] = $name === 'private' ? 'private' : 'public'; }
-        if (!in_array($name, ['private', 'temp'], true)) { $result[$name]['url'] = ''; }
+        if (!in_array($name, ['private', 'temp'], true)) { $result[$name]['url'] = $url; }
     }
     return $result;
 }

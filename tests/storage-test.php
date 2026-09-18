@@ -16,10 +16,10 @@ $check(file_get_contents($root . '/files/document.pdf') === 'fixture document');
 $check(!file_exists($root . '/public/sitemap/live.xml'));
 $check($overrides === ['S3_KEY' => '', 'S3_SECRET' => '', 'CDN_URL' => '']);
 $check(glob($data . '/s3-read-*') === []);
-foreach (cloneLocalFilesystems() as $name => $storage) {
+foreach (cloneLocalFilesystems('https://clone.example.test') as $name => $storage) {
     $check($storage['type'] === 'local');
     $check(!isset($storage['config']['credentials']));
-    $check(!isset($storage['url']) || $storage['url'] === '');
+    $check(!isset($storage['url']) || $storage['url'] === 'https://clone.example.test');
 }
-$check(count(cloneLocalFilesystems()) === 6);
+$check(count(cloneLocalFilesystems('https://clone.example.test')) === 6);
 echo "S3 media/private files copied locally; generated sitemap excluded; credentials cleared; all six adapters local: OK\n";

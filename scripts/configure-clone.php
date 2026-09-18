@@ -155,7 +155,7 @@ function configureClone(): void
         foreach (['', 'when@prod'] as $scope) {
             if ($scope === '') { $section =& $config; } else { $section =& $config[$scope]; }
             if (!is_array($section)) { unset($section); continue; }
-            foreach (array_keys(cloneLocalFilesystems()) as $filesystem) {
+            foreach (array_keys(cloneLocalFilesystems($target)) as $filesystem) {
                 unset($section['shopware']['filesystem'][$filesystem]);
             }
             if (isset($section['shopware']['filesystem']) && $section['shopware']['filesystem'] === []) { unset($section['shopware']['filesystem']); }
@@ -194,7 +194,7 @@ function configureClone(): void
     file_put_contents($data . '/runtime.sh', $runtimeShell);
     $extra = [
         'framework' => ['trusted_proxies' => 'REMOTE_ADDR', 'trusted_headers' => ['x-forwarded-for', 'x-forwarded-proto', 'x-forwarded-port'], 'mailer' => ['dsn' => 'smtp://127.0.0.1:1025'], 'session' => ['handler_id' => null]],
-        'shopware' => ['filesystem' => cloneLocalFilesystems(), 'cdn' => ['url' => '', 'fastly' => ['api_key' => '']], 'admin_worker' => ['enable_admin_worker' => false]],
+        'shopware' => ['filesystem' => cloneLocalFilesystems($target), 'cdn' => ['url' => '', 'fastly' => ['api_key' => '']], 'admin_worker' => ['enable_admin_worker' => false]],
     ];
     if (isset($packages['shopware/elasticsearch'])) {
         $extra['elasticsearch'] = ['hosts' => $endpoint, 'enabled' => $search, 'indexing_enabled' => $search, 'index_prefix' => 'clone', 'index_settings' => ['number_of_replicas' => 0], 'administration' => ['hosts' => $endpoint, 'enabled' => $adminSearch, 'index_prefix' => 'clone-admin', 'index_settings' => ['number_of_replicas' => 0]]];
