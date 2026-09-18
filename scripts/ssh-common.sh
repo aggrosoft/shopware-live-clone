@@ -13,15 +13,32 @@ clone_ssh_init() {
     fi
     [[ ${SOURCE_SHOP_PATH:-} == /* && $SOURCE_SHOP_PATH != *$'\n'* && $SOURCE_SHOP_PATH != *$'\r'* ]] || clone_fail 'SOURCE_SHOP_PATH must be an absolute project directory.'
     [[ -n ${SOURCE_SSH_PRIVATE_KEY:-} ]] || clone_fail 'Missing SOURCE_SSH_PRIVATE_KEY.'
-    [[ -n ${SOURCE_SSH_KNOWN_HOSTS:-} ]] || clone_fail 'Missing verified SOURCE_SSH_KNOWN_HOSTS.'
     clone_tmp=$(mktemp -d /tmp/shopware-clone.XXXXXXXX)
     printf '%s\n' "$SOURCE_SSH_PRIVATE_KEY" > "$clone_tmp/key"
-    printf '%s\n' "$SOURCE_SSH_KNOWN_HOSTS" > "$clone_tmp/known_hosts"
+    local known_hosts strict_host_key_checking
+    if [[ -n ${SOURCE_SSH_KNOWN_HOSTS:-} ]]; then
+        known_hosts=$clone_tmp/known_hosts
+        strict_host_key_checking=yes
+        printf '%s\n' "$SOURCE_SSH_KNOWN_HOSTS" > "$known_hosts"
+    else
+        # Keep first-contact trust in the clone volume, outside the copied shop.
+        local trust_dir=/var/lib/shopware-clone/ssh
+        [[ -d /var/lib/shopware-clone && ! -L /var/lib/shopware-clone ]] || clone_fail 'Missing clone data directory.'
+        [[ ! -L $trust_dir ]] || clone_fail 'Invalid SSH trust directory.'
+        mkdir -p -m 700 "$trust_dir"
+        chmod 700 "$trust_dir"
+        known_hosts=$trust_dir/known_hosts
+        [[ ! -L $known_hosts && ( ! -e $known_hosts || -f $known_hosts ) ]] || clone_fail 'Invalid SSH known_hosts file.'
+        touch "$known_hosts"
+        chmod 600 "$known_hosts"
+        strict_host_key_checking=accept-new
+    fi
     unset SOURCE_SSH_PRIVATE_KEY SOURCE_SSH_KNOWN_HOSTS
     printf '%s\n' 'Host clone-source' \
         "HostName $SOURCE_SSH_HOST" "Port $port" "User $SOURCE_SSH_USER" \
-        "IdentityFile $clone_tmp/key" "UserKnownHostsFile $clone_tmp/known_hosts" \
-        'GlobalKnownHostsFile /dev/null' 'StrictHostKeyChecking yes' \
+        "IdentityFile $clone_tmp/key" "UserKnownHostsFile $known_hosts" \
+        'GlobalKnownHostsFile /dev/null' "StrictHostKeyChecking $strict_host_key_checking" \
+        'UpdateHostKeys no' \
         'BatchMode yes' 'IdentitiesOnly yes' 'IdentityAgent none' \
         'ConnectTimeout 15' 'ServerAliveInterval 15' 'ServerAliveCountMax 2' \
         'LogLevel ERROR' > "$clone_tmp/config"

@@ -51,7 +51,6 @@ jobs:
           SOURCE_SSH_HOST: hosting.example.org
           SOURCE_SSH_USER: fixture
           SOURCE_SSH_PRIVATE_KEY: fixture
-          SOURCE_SSH_KNOWN_HOSTS: fixture
           SOURCE_SHOP_PATH: /shop
           SERVICE_URL_SHOP_80: https://test.example.org
         run: docker compose config --quiet

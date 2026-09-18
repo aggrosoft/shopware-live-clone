@@ -11,7 +11,7 @@ services:
       SOURCE_SSH_PORT: ${SOURCE_SSH_PORT:-22}
       SOURCE_SSH_USER: ${SOURCE_SSH_USER:?Set SSH user}
       SOURCE_SSH_PRIVATE_KEY: ${SOURCE_SSH_PRIVATE_KEY:?Set private key}
-      SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:?Set verified host key}
+      SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:-}
       SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
     volumes:
       - clone_data:/var/lib/shopware-clone

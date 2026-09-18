@@ -5,7 +5,7 @@ Wegwerf-Testkopien bestehender Shopware-Shops auf Basis von Dockware Essentials 
 ## Verwendung in Coolify
 
 1. Neue **Docker Compose**-Ressource anlegen und `compose.yaml` aus diesem Repository einfügen.
-2. Für das private Image `ghcr.io/aggrosoft/shopware-live-clone:main` einen GHCR-Registry-Zugang mit Leserecht hinterlegen.
+2. Das öffentliche Image `ghcr.io/aggrosoft/shopware-live-clone:main` verwenden; ein GHCR-Registry-Zugang ist nicht nötig.
 3. Die folgenden Variablen setzen. Private Keys nicht ins Repository oder als Build-Argument speichern.
 4. Eine Testdomain für den Service `shop`, Port 80, vergeben. Coolify stellt sie über `SERVICE_URL_SHOP_80` bereit; daraus wird `CLONE_URL`.
 5. Deployen und die Phasen im Containerlog verfolgen. Der erste Import kann bei großen Shops lange dauern.
@@ -16,10 +16,12 @@ Wegwerf-Testkopien bestehender Shopware-Shops auf Basis von Dockware Essentials 
 | `SOURCE_SSH_PORT` | Optional, Standard 22 |
 | `SOURCE_SSH_USER` | Hosting-Benutzer |
 | `SOURCE_SSH_PRIVATE_KEY` | Mehrzeiliger privater Schlüssel ohne interaktive Passphrase |
-| `SOURCE_SSH_KNOWN_HOSTS` | Verifizierter SSH-Hostschlüsseleintrag; bei anderem Port im Format `[host]:port` |
+| `SOURCE_SSH_KNOWN_HOSTS` | Optional: verifizierter SSH-Hostschlüsseleintrag für strikte Prüfung; bei anderem Port im Format `[host]:port` |
 | `SOURCE_SHOP_PATH` | Absoluter Projektordner mit `composer.lock` und `bin/console`, nicht `public` |
 | `SOURCE_URL` | Exakte Haupt-Verkaufskanal-URL der Quelle, einschließlich http/https und gegebenenfalls Unterpfad |
 | `CLONE_URL` | Wird in der Compose-Vorlage aus der Coolify-Domain übernommen |
+
+Ohne `SOURCE_SSH_KNOWN_HOSTS` wird der SSH-Hostschlüssel beim ersten Kontakt automatisch akzeptiert (`accept-new`) und unter `/var/lib/shopware-clone/ssh/known_hosts` im Volume `clone_data` gespeichert. Weitere Verbindungen verwenden diesen gespeicherten Schlüssel; ein geänderter Schlüssel wird abgelehnt. Beim ersten Kontakt findet keine unabhängige Identitätsprüfung statt. Mit neuen Volumes beginnt auch die Vertrauensprüfung von vorn. Eine explizite ENV-Vorgabe hat Vorrang und verwendet weiterhin strikte Prüfung.
 
 Die Testdomain muss von live abweichen. Zusätzliche Verkaufskanäle und HTTP-/HTTPS-Aliase bekommen eindeutige Pfade unter `/__clone/...`. Sprachpfade des Hauptshops bleiben erhalten. Die Zuordnung steht privat unter `/var/lib/shopware-clone/domain-map.json`.
 
@@ -63,7 +65,7 @@ Keine festen externen Volumenamen und keine gemeinsamen Bind-Mounts zwischen Sho
 
 ## Grenzen des Imports
 
-- SSH-Key und Hostschlüssel werden temporär geschrieben und nach dem Transfer entfernt. Keine Passwörter/DSNs in normalen Logs.
+- Der private SSH-Key und eine explizite Hostschlüssel-Vorgabe werden nur temporär geschrieben und nach dem Transfer entfernt. Automatisch akzeptierte Hostschlüssel bleiben im Clone-Volume gespeichert. Keine Passwörter/DSNs in normalen Logs.
 - Quell-PHP-Konfiguration wird als Daten geparst; Symfony-Standard-`.env.local.php` wird nicht ausgeführt. Unterstützt sind literale dotenv-Werte und einfache Variablenreferenzen. Unbekannte Ausdrücke oder DB-Verbindungsoptionen führen zum Abbruch.
 - Die Quelle benötigt PHP CLI ab 7.4, SSH, rsync sowie mysql/mariadb und das passende Dump-Programm.
 - Nicht-InnoDB-Tabellen werden abgelehnt. Während des Imports keine Schemaänderungen/Deployments auf live durchführen. Dateien und DB sind kein gemeinsamer atomarer Snapshot.

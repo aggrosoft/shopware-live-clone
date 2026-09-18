@@ -48,6 +48,37 @@ if SOURCE_SSH_KNOWN_HOSTS="[127.0.0.1]:22222 $(< "$fixture/wrong_key.pub")" \
 fi
 test ! -e /var/lib/shopware-clone/state.json
 
+# A supplied, correct key still works with strict checking.
+probe_source() (
+    # shellcheck source=scripts/ssh-common.sh
+    source /opt/shopware-live-clone/ssh-common.sh
+    trap clone_ssh_cleanup EXIT
+    clone_ssh_init
+    clone_ssh true
+)
+probe_source
+
+# First contact without a supplied key persists trust across new SSH sessions.
+unset SOURCE_SSH_KNOWN_HOSTS
+probe_source
+trust=/var/lib/shopware-clone/ssh/known_hosts
+test -s "$trust"
+ssh-keygen -F '[127.0.0.1]:22222' -f "$trust" > /dev/null
+test "$(stat -c %a "$trust")" = 600
+cp "$trust" "$fixture/learned_hosts"
+probe_source
+cmp "$trust" "$fixture/learned_hosts"
+
+# A different key for that already known endpoint must not be accepted/overwritten.
+printf '[127.0.0.1]:22222 %s\n' "$(< "$fixture/wrong_key.pub")" > "$trust"
+cp "$trust" "$fixture/mismatched_hosts"
+if probe_source > "$fixture/changed-host.log" 2>&1; then
+    printf '%s\n' 'Changed host key was incorrectly accepted.' >&2; exit 1
+fi
+grep -q 'REMOTE HOST IDENTIFICATION HAS CHANGED' "$fixture/changed-host.log"
+cmp "$trust" "$fixture/mismatched_hosts"
+cp "$fixture/learned_hosts" "$trust"
+
 /opt/shopware-live-clone/import-source.sh > "$fixture/import.log" 2>&1 || { cat "$fixture/import.log"; exit 1; }
 jq -e '.phase == "imported" and .ready == false' /var/lib/shopware-clone/state.json
 cmp "$shop/custom/plugins/Example/plugin.txt" /var/lib/shopware-clone/source/custom/plugins/Example/plugin.txt
