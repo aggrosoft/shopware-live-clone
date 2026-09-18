@@ -9,6 +9,7 @@ for executable in bash ssh rsync mysql mysqldump jq gzip flock sudo timeout base
 done
 
 test -r /entrypoint.sh
+! grep -Eq '^[[:space:]]*sudo service mysql start' /entrypoint.sh
 test -r /var/www/makefile
 test ! -e /var/www/html/shopware.tar.zst
 test ! -e /var/www/html/bin/console

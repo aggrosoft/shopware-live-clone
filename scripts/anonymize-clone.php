@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/clone-database.php';
 
 function anonymizeCloneCustomers(PDO $pdo): array
 {
@@ -51,8 +52,8 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
                 throw new RuntimeException('Cannot schedule local cache/index rebuild.');
             }
         }
-        // Fixed local connection. Never read or use the source DATABASE_URL.
-        $pdo = new PDO('mysql:unix_socket=/var/run/mysqld/mysqld.sock;dbname=shopware_clone;charset=utf8mb4', 'root', 'root', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        // Fixed clone connection. Never read or use the source DATABASE_URL.
+        $pdo = cloneDatabasePdo();
         $counts = anonymizeCloneCustomers($pdo);
         if (file_put_contents($data . '/anonymized-v1.json', json_encode(['version' => 1, 'updated_rows' => $counts], JSON_THROW_ON_ERROR)) === false) {
             throw new RuntimeException('Cannot save anonymization status.');

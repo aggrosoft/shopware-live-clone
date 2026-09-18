@@ -33,9 +33,23 @@ if [[ ! -f $data/state.json ]] || jq -e '.phase == "failed"' "$data/state.json" 
     "$scripts/import-source.sh"
 fi
 unset SOURCE_SSH_PRIVATE_KEY SOURCE_SSH_KNOWN_HOSTS
-sudo install -d -o mysql -g mysql /var/run/mysqld
-if ! pgrep -x mysqld > /dev/null; then sudo rm -f /var/run/mysqld/mysqld.sock.lock; fi
-sudo service mysql start > /dev/null 2>&1
+clone_db_host=${CLONE_DATABASE_HOST:-127.0.0.1}
+clone_db_port=${CLONE_DATABASE_PORT:-3306}
+if [[ $clone_db_host == 127.0.0.1 || $clone_db_host == localhost ]]; then
+    sudo install -d -o mysql -g mysql /var/run/mysqld
+    if ! pgrep -x mysqld > /dev/null; then sudo rm -f /var/run/mysqld/mysqld.sock.lock; fi
+    sudo service mysql start > /dev/null 2>&1
+fi
+database_ready=0
+for ((attempt=0; attempt<60; attempt++)); do
+    if MYSQL_PWD=root MYSQL_TEST_LOGIN_FILE=/dev/null mysql --no-defaults --protocol=TCP \
+        --host="$clone_db_host" --port="$clone_db_port" --user=root --execute='SELECT 1' > /dev/null 2>&1; then
+        database_ready=1
+        break
+    fi
+    sleep 2
+done
+[[ $database_ready == 1 ]] || { echo 'Clone MariaDB did not become ready.' >&2; exit 1; }
 clone_progress_start '[6/7] Anonymizing customer and order contact details'
 php "$scripts/anonymize-clone.php"
 clone_progress_done

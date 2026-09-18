@@ -8,10 +8,12 @@ source "$script_dir/ssh-common.sh"
 # shellcheck source=scripts/progress.sh
 source "$script_dir/progress.sh"
 
-# Fixed paths and local socket: source configuration never controls restore targets.
+# Fixed target connection: source configuration never controls restore targets.
 clone_data=/var/lib/shopware-clone
 clone_source=$clone_data/source
 clone_archive=$clone_data/database.sql.gz
+clone_db_host=${CLONE_DATABASE_HOST:-127.0.0.1}
+clone_db_port=${CLONE_DATABASE_PORT:-3306}
 clone_started=0
 clone_success=0
 clone_resume=0
@@ -68,14 +70,24 @@ jq -e '.schema_version == 1 and .php.supported_by_image == true and .shopware.ve
 
 clone_progress_done
 
-# Start only the isolated local database, never the Dockware web/worker entrypoint.
-clone_progress_start "[1/7] Starting local database"
-sudo install -d -o mysql -g mysql /var/run/mysqld
-if ! sudo service mysql start > /dev/null 2>&1; then clone_fail 'Local MySQL could not start.'; fi
-printf '%s\n' '[client]' 'user=root' 'password=root' 'protocol=SOCKET' 'socket=/var/run/mysqld/mysqld.sock' > "$clone_tmp/mysql.cnf"
+[[ $clone_db_host =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ && $clone_db_port =~ ^[0-9]+$ && $clone_db_port -ge 1 && $clone_db_port -le 65535 ]] \
+    || clone_fail 'Invalid clone database endpoint.'
+# CI can still exercise the image standalone. Coolify uses the dedicated MariaDB service.
+clone_progress_start "[1/7] Waiting for clone MariaDB"
+if [[ $clone_db_host == 127.0.0.1 || $clone_db_host == localhost ]]; then
+    sudo install -d -o mysql -g mysql /var/run/mysqld
+    if ! sudo service mysql start > /dev/null 2>&1; then clone_fail 'Bundled database could not start.'; fi
+fi
+printf '%s\n' '[client]' 'user=root' 'password=root' 'protocol=TCP' "host=$clone_db_host" "port=$clone_db_port" > "$clone_tmp/mysql.cnf"
 local_mysql() { MYSQL_TEST_LOGIN_FILE=/dev/null mysql --defaults-file="$clone_tmp/mysql.cnf" --batch --skip-column-names "$@"; }
+database_ready=0
+for ((attempt=0; attempt<60; attempt++)); do
+    if local_mysql -e 'SELECT 1' > /dev/null 2> "$clone_tmp/error"; then database_ready=1; break; fi
+    sleep 2
+done
+[[ $database_ready == 1 ]] || clone_fail 'Clone MariaDB did not become ready.'
 existing=$(local_mysql -e "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='shopware_clone'" 2> "$clone_tmp/error") \
-    || clone_fail 'Cannot connect to the isolated local MySQL socket.'
+    || clone_fail 'Cannot connect to clone MariaDB.'
 [[ $existing == 0 ]] || clone_fail 'Local shopware_clone database already exists; no data was overwritten.'
 clone_progress_done
 
@@ -115,13 +127,13 @@ if ! clone_ssh "php -d display_errors=0 -d log_errors=0 -- '$clone_encoded_path'
 fi
 clone_progress_done
 # gzip validates its checksum while streaming the restore; no second full read.
-printf '%s\n' '[5/7] Restoring local database...'
+printf '%s\n' '[5/7] Restoring clone database into MariaDB...'
 local_mysql -e 'CREATE DATABASE shopware_clone CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' \
     2> "$clone_tmp/error" || clone_fail 'Could not create the local clone database.'
 # --binary-mode disables mysql client commands in the input dump.
 clone_progress_start "[5/7] Executing SQL in local database"
 if ! { gzip -dc "$clone_archive" | local_mysql --binary-mode=1 shopware_clone > /dev/null; } 2> "$clone_tmp/error"; then
-    clone_fail 'Local restore failed (for example an incompatible source collation). No shop services were started.'
+    clone_fail 'MariaDB restore failed (for example an incompatible source collation). No shop services were started.'
 fi
 clone_progress_done
 tables=$(local_mysql -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='shopware_clone' AND table_name IN ('product','sales_channel_domain','system_config')" 2> "$clone_tmp/error")

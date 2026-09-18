@@ -45,6 +45,7 @@ jobs:
           php -l scripts/detect-source.php
           php tests/detect-source-test.php
           php -l scripts/source-database.php
+          php -l scripts/clone-database.php
           php -l scripts/validate-copy.php
           php tests/database-config-test.php
           php -l scripts/configure-clone.php

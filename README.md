@@ -30,7 +30,7 @@ Die aktuelle Automatisierung unterstützt Shopware 6.6/6.7 mit PHP 8.2–8.5. So
 ## Ablauf
 
 - Beim ersten Start: Quelle per SSH untersuchen, Dateien inklusive Plugins, Themes, vendor und Medien kopieren; konsistenten InnoDB-Dump lokal importieren.
-- Quellkonfiguration sichern, DB auf den lokalen Socket/Server und Redis-Verbindungen auf lokalen Redis umstellen. Mailer-ENV und Shopware-Mailer-Auswahl werden auf den lokalen Mailfänger gelenkt.
+- Quellkonfiguration sichern, DB auf den MariaDB-Dienst und Redis-Verbindungen auf lokalen Redis umstellen. Mailer-ENV und Shopware-Mailer-Auswahl werden auf den lokalen Mailfänger gelenkt.
 - Verkaufskanal-Domains ersetzen und die kopierten wartenden Nachrichten entfernen. Als laufend/queued markierte Scheduled Tasks werden zurückgesetzt.
 - Cache, Assets und Themes vorbereiten; lokale Suchindizes bei aktivierter Suche synchron neu aufbauen.
 - Erst danach Dockware, Cron und zwei Queue-Worker starten. Worker verarbeiten `async` und `low_priority`, nicht automatisch die Fehlerqueue.
@@ -44,7 +44,7 @@ Die Mailoberfläche ist über `/mailcatcher` erreichbar. Dockware bringt auch `/
 
 | Dienst | Verwendung |
 |---|---|
-| MySQL in Dockware | Eigene Datenbank `shopware_clone` |
+| MariaDB 11.4 | Eigene Datenbank `shopware_clone`; passend zu den MariaDB-Quellen |
 | Redis 7.4 | Cache/Redis-Verbindungen; getrennte logische DBs für unterschiedliche Quell-DSNs |
 | OpenSearch 2.19.4 | Lokale Suche für alle Kopien mit aktivierter Suche |
 | Mailfänger in Dockware | Standard-Mailversand der Kopie |
@@ -56,7 +56,7 @@ Die Vorlage enthält nur OpenSearch als Suchdienst, mit 512 MB Java-Heap. Der Co
 | Volume | Inhalt |
 |---|---|
 | `clone_data` | Shop unter `source/`, Konfigurationssicherungen, Status und private Logs |
-| `clone_db` | MySQL-Daten |
+| `clone_db` | MariaDB-Daten |
 | `clone_redis` | Lokaler Redis |
 | `clone_opensearch` | Lokale Suchindizes |
 
@@ -66,7 +66,7 @@ Keine festen externen Volumenamen und keine gemeinsamen Bind-Mounts zwischen Sho
 
 - Der private SSH-Key und eine explizite Hostschlüssel-Vorgabe werden nur temporär geschrieben und nach dem Transfer entfernt. Automatisch akzeptierte Hostschlüssel bleiben im Clone-Volume gespeichert. Keine Passwörter/DSNs in normalen Logs.
 - Quell-PHP-Konfiguration wird als Daten geparst; Symfony-Standard-`.env.local.php` wird nicht ausgeführt. Unterstützt sind literale dotenv-Werte und einfache Variablenreferenzen. Unbekannte Ausdrücke oder DB-Verbindungsoptionen führen zum Abbruch.
-- Die Quelle benötigt PHP CLI ab 7.4, SSH, rsync sowie mysql/mariadb und das passende Dump-Programm.
+- Die Quelle benötigt PHP CLI ab 7.4, SSH, rsync sowie MariaDB und `mariadb-dump`/`mysqldump` aus der MariaDB-Distribution. Der Dump wird unverändert in MariaDB 11.4 eingespielt; es gibt keine SQL-Rewrites.
 - Nicht-InnoDB-Tabellen werden abgelehnt. Während des Imports keine Schemaänderungen/Deployments auf live durchführen. Dateien und DB sind kein gemeinsamer atomarer Snapshot.
 - Der komprimierte Dump wird lokal zwischengespeichert. Platz für Shopdateien, Dump und Ziel-DB vorsehen. Cache, Logs, Sessions, .git und node_modules werden ausgelassen.
 - Symlink-Ziele werden als echte Dateien/Verzeichnisse mitkopiert, einschließlich externer Plugin- und Medienverzeichnisse. Bereits auf der Quelle kaputte Links werden mit Warnung übersprungen. Unlesbare Dateien und andere Transferfehler bleiben Fehler. Mehrere DB-Verbindungen und andere externe Storage-Adapter als Shopwares `amazon-s3` sind noch nicht automatisch unterstützt. Es wird nicht stillschweigend auf die Live-DB oder Live-Buckets zurückgeschrieben.
@@ -91,7 +91,7 @@ Original-Konfiguration unter `original-config/` und detaillierte Fehlerlogs kön
 
 ## Build und Tests
 
-GitHub Actions prüft Shell/PHP, Konfigurationsfälle und Compose, baut das Image, testet einen künstlichen SSH/MySQL-Import und führt einen vollständigen Smoke-Test mit einem offiziellen Shopware-6.7.10.0-Demoshop aus. Dieser umfasst OpenSearch, Redis, Storefront, Mailfänger, Worker und Neustart bei abgeschalteter Quelle. Erst danach wird das Image nach GHCR veröffentlicht.
+GitHub Actions prüft Shell/PHP, Konfigurationsfälle und Compose, baut das Image, testet einen künstlichen SSH-Import und führt einen vollständigen Smoke-Test mit MariaDB 11.4 und einem offiziellen Shopware-6.7.10.0-Demoshop aus. Dieser umfasst OpenSearch, Redis, Storefront, Mailfänger, Worker und Neustart bei abgeschalteter Quelle. Erst danach wird das Image nach GHCR veröffentlicht.
 
 Tags: `main`, `sha-<commit>` und gegebenenfalls Release-Tags. Plattform zunächst linux/amd64. Keine Live-Daten oder Zugangsdaten gelangen in den Image-Build. Es wurde noch kein echter Hetzner-Kundenshop getestet.
 
@@ -111,7 +111,9 @@ Dies ist eine gezielte Bereinigung der Standardfelder, keine vollständige Anony
 
 Beim Aktualisieren einer bestehenden Coolify-Ressource auch die Compose-Konfiguration anpassen: den Service `elasticsearch`, dessen Eintrag unter `shop.depends_on` und die Deklaration `clone_elasticsearch` entfernen. Ein Image-Pull allein ändert die Compose-Konfiguration nicht. Bereits konfigurierte Kopien behalten ihre gespeicherten Einstellungen; wenn eine alte Kopie tatsächlich Elasticsearch verwendet, muss ihre lokale Suchkonfiguration vor dem Entfernen dieses Dienstes auf OpenSearch umgestellt werden.
 
-Bei Fehlern während Import oder Vorbereitung bleibt der Container für das Coolify-Terminal erreichbar. Shop, Cron und Worker werden nicht gestartet; der Healthcheck bleibt negativ. Im Terminal können `cat /var/lib/shopware-clone/import-error.log` bzw. die unter `*error.log` und `setup.log` genannten Details gelesen werden. MySQL- und gzip-Fehler werden vor dem Entfernen temporärer Dateien gesichert. Ein Neustart versucht den normalen Ablauf erneut; unvollständige Datenbank-Restores werden weiterhin nicht still überschrieben.
+Bei Fehlern während Import oder Vorbereitung bleibt der Container für das Coolify-Terminal erreichbar. Shop, Cron und Worker werden nicht gestartet; der Healthcheck bleibt negativ. Im Terminal können `cat /var/lib/shopware-clone/import-error.log` bzw. die unter `*error.log` und `setup.log` genannten Details gelesen werden. MariaDB- und gzip-Fehler werden vor dem Entfernen temporärer Dateien gesichert. Ein Neustart versucht den normalen Ablauf erneut; unvollständige Datenbank-Restores werden weiterhin nicht still überschrieben.
+
+Seit der Umstellung von Dockwares eingebautem MySQL auf MariaDB muss auch die aktuelle `compose.yaml` übernommen werden. Ein Image-Pull allein fügt den Datenbankdienst nicht hinzu. Alte `clone_db`-Volumes mit MySQL-8-Daten sind nicht weiterverwendbar; für diese Wegwerfkopien neue Volumes anlegen.
 
 ## S3 und CDN in Kopien
 

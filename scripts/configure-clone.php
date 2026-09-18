@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__ . '/source-database.php';
 require_once __DIR__ . '/storage-clone.php';
+require_once __DIR__ . '/clone-database.php';
 
 function cloneUrl(string $url): string
 {
@@ -106,9 +107,9 @@ function configureClone(): void
     $packages = array_column($lock['packages'], 'version', 'name');
     $engine = 'opensearch';
     $endpoint = 'http://opensearch:9200';
-    $pdo = new PDO('mysql:unix_socket=/var/run/mysqld/mysqld.sock;dbname=shopware_clone;charset=utf8mb4', 'root', 'root', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $pdo = cloneDatabasePdo();
     $dbVersion = $pdo->query('SELECT VERSION()')->fetchColumn();
-    $dbUrl = 'mysql://root:root@127.0.0.1:3306/shopware_clone?charset=utf8mb4&serverVersion=' . rawurlencode($dbVersion);
+    $dbUrl = cloneDatabaseUrl((string) $dbVersion);
     $redisMap = [];
     $rewrite = static function (string $value) use (&$redisMap, $endpoint, $dbUrl, $root): string {
         if (preg_match('~^rediss?://~', $value)) {

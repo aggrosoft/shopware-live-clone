@@ -14,6 +14,10 @@ COPY --chmod=0755 scripts/ /opt/shopware-live-clone/
 
 USER root
 RUN apt-get update && apt-get install -y --no-install-recommends rclone && rm -rf /var/lib/apt/lists/*
+# The clone uses the Compose MariaDB service. Keep Dockware's bundled MySQL
+# stopped when its original entrypoint later starts Apache/cron/supervisor.
+RUN sed -i '/echo "DOCKWARE: starting MySQL/,/sudo service mysql start;/c\    echo "DOCKWARE: external MariaDB is used; bundled MySQL stays stopped."' /entrypoint.sh \
+    && ! grep -Eq '^[[:space:]]*sudo service mysql start' /entrypoint.sh
 RUN install -d -m 0700 -o dockware -g www-data /var/lib/shopware-clone
 USER dockware
 

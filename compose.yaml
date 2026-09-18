@@ -13,14 +13,32 @@ services:
       SOURCE_SSH_PRIVATE_KEY: ${SOURCE_SSH_PRIVATE_KEY:?Set private key}
       SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:-}
       SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
+      CLONE_DATABASE_HOST: database
     volumes:
       - clone_data:/var/lib/shopware-clone
-      - clone_db:/var/lib/mysql
     depends_on:
+      database:
+        condition: service_healthy
       redis:
         condition: service_healthy
       opensearch:
         condition: service_healthy
+
+  database:
+    image: mariadb:11.4
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_ROOT_HOST: '%'
+    command: [mariadbd, --max-allowed-packet=1G, --innodb-flush-log-at-trx-commit=2, --skip-log-bin]
+    volumes:
+      - clone_db:/var/lib/mysql
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 10s
+      timeout: 5s
+      retries: 30
 
   redis:
     image: redis:7.4
