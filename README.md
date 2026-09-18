@@ -61,7 +61,7 @@ Beide Suchserver laufen in dieser ersten Compose-Version mit je 512 MB Java-Heap
 | `clone_redis` | Lokaler Redis |
 | `clone_opensearch`, `clone_elasticsearch` | Lokale Indizes |
 
-Keine festen externen Volumenamen und keine gemeinsamen Bind-Mounts zwischen Shops verwenden. Für eine frische Kopie eine neue Ressource mit neuen Volumes anlegen; alte Wegwerfkopien samt zugehörigen Volumes anschließend bewusst löschen. Ein fehlgeschlagener Rohimport wird nicht automatisch überschrieben. Nach Fehlern während der lokalen Konfiguration bleibt der Shop gestoppt; Details stehen in den privaten Logs. Nach einem Fehler beim Cache-/Theme-/Index-Aufbau kann ein Neustart diese Vorbereitungen erneut versuchen, ohne neu zu importieren.
+Keine festen externen Volumenamen und keine gemeinsamen Bind-Mounts zwischen Shops verwenden. Für eine frische Kopie eine neue Ressource mit neuen Volumes anlegen; alte Wegwerfkopien samt zugehörigen Volumes anschließend bewusst löschen. Nach einem Abbruch während der Dateikopie kann der nächste Start vorhandene Dateien weiterverwenden, solange noch kein Dump und keine lokale Clone-Datenbank vorhanden sind. Spätere fehlgeschlagene Rohimporte benötigen frische Volumes. Nach Fehlern während der lokalen Konfiguration bleibt der Shop gestoppt; Details stehen in den privaten Logs. Nach einem Fehler beim Cache-/Theme-/Index-Aufbau kann ein Neustart diese Vorbereitungen erneut versuchen, ohne neu zu importieren.
 
 ## Grenzen des Imports
 
@@ -70,7 +70,7 @@ Keine festen externen Volumenamen und keine gemeinsamen Bind-Mounts zwischen Sho
 - Die Quelle benötigt PHP CLI ab 7.4, SSH, rsync sowie mysql/mariadb und das passende Dump-Programm.
 - Nicht-InnoDB-Tabellen werden abgelehnt. Während des Imports keine Schemaänderungen/Deployments auf live durchführen. Dateien und DB sind kein gemeinsamer atomarer Snapshot.
 - Der komprimierte Dump wird lokal zwischengespeichert. Platz für Shopdateien, Dump und Ziel-DB vorsehen. Cache, Logs, Sessions, .git und node_modules werden ausgelassen.
-- Externe/beschädigte Symlinks, mehrere DB-Verbindungen und externes Medien-Storage (z. B. S3) sind noch nicht automatisch unterstützt. Es wird nicht stillschweigend auf die Live-DB oder Live-Buckets zurückgeschrieben.
+- Symlink-Ziele werden als echte Dateien/Verzeichnisse mitkopiert, einschließlich externer Plugin- und Medienverzeichnisse. Bereits auf der Quelle kaputte Links werden mit Warnung übersprungen. Unlesbare Dateien und andere Transferfehler bleiben Fehler. Mehrere DB-Verbindungen und externes Medien-Storage (z. B. S3) sind noch nicht automatisch unterstützt. Es wird nicht stillschweigend auf die Live-DB oder Live-Buckets zurückgeschrieben.
 - Komplexe PHP/XML-Konfiguration, ungewöhnliche Service-Definitionen, domainabhängige Apps/Lizenzen und Plugins können zusätzliche Anpassungen benötigen. Datenbank-Collations werden nicht still konvertiert.
 - PHP wird aus .htaccess oder der CLI ermittelt. Bedingte Apache-Regeln und Einstellungen ausschließlich im Hosting-Panel können eine andere Web-PHP-Version ergeben.
 - Lokale Konfiguration verarbeitet die üblichen YAML-Paketdateien. Kein allgemeines Versprechen für beliebige Plugin-eigene Datenbank- oder SMTP-Clients.

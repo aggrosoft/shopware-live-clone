@@ -13,7 +13,7 @@ exec 8> "$data/startup.lock"
 flock -n 8 || { echo 'A clone startup is already running.' >&2; exit 1; }
 rm -f /var/www/container.launched
 
-if [[ ! -f $data/state.json ]]; then
+if [[ ! -f $data/state.json ]] || jq -e '.phase == "failed"' "$data/state.json" >/dev/null; then
     "$scripts/import-source.sh"
 fi
 unset SOURCE_SSH_PRIVATE_KEY SOURCE_SSH_KNOWN_HOSTS

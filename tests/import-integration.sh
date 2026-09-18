@@ -12,6 +12,11 @@ printf '%s\n' 'AddHandler application/x-httpd-php83 .php' > "$shop/public/.htacc
 printf '%s\n' 'plugin fixture' > "$shop/custom/plugins/Example/plugin.txt"
 printf '%s\n' 'media fixture' > "$shop/public/media/test.txt"
 printf '%s\n' 'do not copy cache' > "$shop/var/cache/excluded.txt"
+mkdir -p "$fixture/shared-plugin"
+printf '%s\n' 'external plugin fixture' > "$fixture/shared-plugin/shared.txt"
+ln -s "$fixture/shared-plugin" "$shop/custom/plugins/Shared"
+ln -s "$shop/public/media/test.txt" "$shop/public/media/absolute.txt"
+ln -s /missing-clone-fixture-target "$shop/public/media/broken.txt"
 printf '%s\n' "DATABASE_URL='mysql://root:root@127.0.0.1/live_fixture'" > "$shop/.env"
 
 sudo install -d -o mysql -g mysql /var/run/mysqld
@@ -30,6 +35,9 @@ unset MYSQL_PWD
 
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/client_key"
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/host_key"
+# The simulated SSH source does not run Dockware's entrypoint/NVM unpacking.
+mkdir -p /var/www/.nvm
+touch /var/www/.nvm/nvm.sh
 sudo install -d -m 0755 /run/sshd
 sudo /usr/sbin/sshd -p 22222 -h "$fixture/host_key" \
     -o "PidFile=$fixture/sshd.pid" -o "AuthorizedKeysFile=$fixture/client_key.pub" \
@@ -79,10 +87,22 @@ grep -q 'REMOTE HOST IDENTIFICATION HAS CHANGED' "$fixture/changed-host.log"
 cmp "$trust" "$fixture/mismatched_hosts"
 cp "$fixture/learned_hosts" "$trust"
 
+# Simulate the old validator's early failure, retaining the already copied files.
+mkdir -p /var/lib/shopware-clone/source/public/media
+cp "$shop/public/media/test.txt" /var/lib/shopware-clone/source/public/media/test.txt
+ln -s /missing-clone-fixture-target /var/lib/shopware-clone/source/public/media/broken.txt
+printf '%s\n' '{"phase":"failed","ready":false}' > /var/lib/shopware-clone/state.json
 /opt/shopware-live-clone/import-source.sh > "$fixture/import.log" 2>&1 || { cat "$fixture/import.log"; exit 1; }
 jq -e '.phase == "imported" and .ready == false' /var/lib/shopware-clone/state.json
 cmp "$shop/custom/plugins/Example/plugin.txt" /var/lib/shopware-clone/source/custom/plugins/Example/plugin.txt
 cmp "$shop/public/media/test.txt" /var/lib/shopware-clone/source/public/media/test.txt
+cmp "$fixture/shared-plugin/shared.txt" /var/lib/shopware-clone/source/custom/plugins/Shared/shared.txt
+test ! -L /var/lib/shopware-clone/source/custom/plugins/Shared
+cmp "$shop/public/media/test.txt" /var/lib/shopware-clone/source/public/media/absolute.txt
+test ! -L /var/lib/shopware-clone/source/public/media/absolute.txt
+test ! -L /var/lib/shopware-clone/source/public/media/broken.txt
+grep -q 'Retrying file copy' "$fixture/import.log"
+grep -q 'skipped broken source link' "$fixture/import.log"
 test ! -e /var/lib/shopware-clone/source/var/cache/excluded.txt
 test ! -e /var/lib/shopware-clone/database.sql.gz
 export MYSQL_PWD=root

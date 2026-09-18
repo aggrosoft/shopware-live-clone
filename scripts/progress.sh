@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Sourced by the importer/startup; their EXIT traps stop the heartbeat.
+clone_progress_script=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/progress.php
 clone_progress_pid=''
 clone_progress_stop() {
     if [[ -n $clone_progress_pid ]]; then
@@ -13,7 +14,7 @@ clone_progress_start() {
     clone_progress_label=$1
     clone_progress_started=$SECONDS
     printf '%s...\n' "$clone_progress_label"
-    php "$(dirname -- "${BASH_SOURCE[0]}")/progress.php" heartbeat "$clone_progress_label" &
+    php "$clone_progress_script" heartbeat "$clone_progress_label" &
     clone_progress_pid=$!
 }
 clone_progress_done() {

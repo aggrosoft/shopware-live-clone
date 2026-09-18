@@ -14,8 +14,10 @@ clone_source=$clone_data/source
 clone_archive=$clone_data/database.sql.gz
 clone_started=0
 clone_success=0
+clone_resume=0
 cleanup() {
     local status=$?
+    (( BASH_SUBSHELL == 0 )) || return "$status"
     clone_progress_stop
     if [[ $clone_started == 1 && $clone_success != 1 ]]; then
         printf '%s\n' '{"schema_version":1,"phase":"failed","ready":false}' > "$clone_data/state.json"
@@ -34,9 +36,15 @@ if [[ -f $clone_data/state.json ]]; then
         printf '%s\n' 'Source already imported. Existing test data kept; local configuration is the next step.'
         exit 0
     fi
-    clone_fail 'Existing or interrupted import found. Create fresh clone and DB volumes; no data was overwritten.'
+    if jq -e '.phase == "failed"' "$clone_data/state.json" >/dev/null &&
+        [[ -d $clone_source && ! -L $clone_source && ! -e $clone_archive && ! -L $clone_archive ]]; then
+        clone_resume=1
+        printf '%s\n' 'Retrying file copy after early import failure; existing files will be reused. Local DB must still be empty.'
+    else
+        clone_fail 'Existing or interrupted import found. Create fresh clone and DB volumes; no data was overwritten.'
+    fi
 fi
-[[ ! -e $clone_source && ! -L $clone_source && ! -e $clone_archive ]] || clone_fail 'Clone target is not empty.'
+[[ $clone_resume == 1 || ( ! -e $clone_source && ! -L $clone_source && ! -e $clone_archive ) ]] || clone_fail 'Clone target is not empty.'
 # This command must run before Dockware starts services, never in a running shop.
 for process in apache2 php-fpm cron supervisord; do
     if pgrep -f "^([^ ]*/)?${process}([ :]|$)" >/dev/null; then
@@ -69,26 +77,29 @@ clone_progress_done
 
 printf '%s\n' '{"schema_version":1,"phase":"importing","ready":false}' > "$clone_data/state.json"
 clone_started=1
-mkdir -m 700 "$clone_source"
+mkdir -p "$clone_source"
+chmod 700 "$clone_source"
 cp "$clone_tmp/result.json" "$clone_data/source-report.json"
 printf '%s\n' '[2/7] Copying files: scanning file list, then transferring (ETA covers this phase only)...'
-# No --delete and no source-side writes. Internal relative symlinks are preserved.
-if ! LC_ALL=C rsync --info=progress2,name0 --no-inc-recursive --outbuf=L --archive --no-owner --no-group --protect-args \
+# Materialize source links so absolute hosting paths work in the clone.
+copy_status=0
+LC_ALL=C rsync --copy-links --rsync-path="LC_ALL=C rsync" --info=progress2,name0 --no-inc-recursive --outbuf=L --archive --no-owner --no-group --protect-args \
     --chmod=u+rwX,go-rwx --timeout=120 \
     --exclude='/.git/' --exclude='/var/cache/' --exclude='/var/log/' --exclude='/var/sessions/' \
     --exclude='/node_modules/' \
     -e "ssh -F $clone_tmp/config" \
     "clone-source:${SOURCE_SHOP_PATH%/}/" "$clone_source/" \
-    2> "$clone_tmp/error" | php "$script_dir/progress.php" rsync "[2/7] Copying files"; then
+    2> "$clone_tmp/error" | php "$script_dir/progress.php" rsync "[2/7] Copying files" || copy_status=$?
+if [[ $copy_status != 0 ]] && ! php "$script_dir/check-rsync-error.php" "$copy_status" "$clone_tmp/error"; then
     cp "$clone_tmp/error" "$clone_data/transfer-error.log"
     clone_fail 'File transfer failed; check path, SSH/rsync and available disk space.'
 fi
 [[ -f $clone_source/composer.lock && -f $clone_source/vendor/autoload.php && -f $clone_source/bin/console ]] \
     || clone_fail 'Copied project is incomplete (possibly external symlinks).'
 clone_progress_start '[3/7] Validating copied files'
-# Reject broken links and symlinks escaping the copied project instead of silently losing data.
-if ! php "$script_dir/validate-copy.php" "$clone_source" > /dev/null 2> "$clone_tmp/error"; then
-    clone_fail 'Copied project contains broken or external symlinks; use a self-contained source tree.'
+# Links should now be materialized; remove leftover broken links from an earlier attempt.
+if ! php "$script_dir/validate-copy.php" "$clone_source"; then
+    clone_fail 'Copied project validation failed.'
 fi
 
 clone_progress_done
