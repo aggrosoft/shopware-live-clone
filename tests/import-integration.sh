@@ -33,6 +33,8 @@ INSERT INTO live_fixture.system_config VALUES (1, 'LIVE_SECRET_SENTINEL');
 SQL
 unset MYSQL_PWD
 
+php /test/tests/anonymize-test.php seed
+
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/client_key"
 ssh-keygen -q -t ed25519 -N '' -f "$fixture/host_key"
 # The simulated SSH source does not run Dockware's entrypoint/NVM unpacking.
@@ -117,3 +119,4 @@ unset MYSQL_PWD
 if grep -q 'LIVE_SECRET_SENTINEL' "$fixture/import.log"; then exit 1; fi
 if pgrep -x apache2 >/dev/null || pgrep -x cron >/dev/null || pgrep -x supervisord >/dev/null; then exit 1; fi
 printf '%s\n' 'SSH file transfer, transactional dump, local restore and repeat-import protection: OK'
+php /test/tests/anonymize-test.php verify

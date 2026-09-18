@@ -101,3 +101,11 @@ Quellen: [Dockware](https://github.com/dockware/shopware), [Shopware](https://gi
 ### Import progress
 
 Container logs show seven setup phases. File copying and SQL restore report bytes, average throughput, percentage and an approximate remaining time every 15 seconds. Rsync first scans the complete file list to make its percentage meaningful. Estimates cover the current phase only, not the complete clone startup. SQL restore progress measures SQL delivered to MySQL; final execution may take longer. Database dumps have no known total size and show bytes and elapsed time. Validation, configuration, cache/theme compilation and search indexing emit a heartbeat every 15 seconds. Detailed command output stays in the private log files. Updates apply to new containers; let an already running import finish before deploying a new image.
+
+## Einfache Anonymisierung
+
+Vor dem ersten Start ersetzt der Klon automatisch Namen und E-Mail-Adressen in `customer` und `order_customer` sowie Namen und Anschriften in `customer_address` und `order_address`. Das umfasst auch Gastbestellungen und gespeicherte Bestellversionen. E-Mails werden zu eindeutigen `kunde-<ID>@example.invalid`-Adressen; verknüpfte Kunden und Bestellungen erhalten dieselbe Adresse. Anschriften werden zu `Teststrasse 1`, `12345 Teststadt`. Firmen, Telefon, Titel, Abteilungen, Adresszusätze, USt-IDs, Geburtstage und Kunden-IP-Adressen werden in diesen Tabellen geleert, soweit vorhanden. Länder/Bundesländer, IDs, Zuordnungen, Bestellpositionen und Beträge bleiben erhalten.
+
+Der Schritt greift ausschließlich auf die lokale Datenbank `shopware_clone` zu. Er läuft einmal pro Kopie (`anonymized-v1.json`), damit spätere Teständerungen bei Neustarts erhalten bleiben. Bestehende Kopien werden beim ersten Start mit dem neuen Image ebenfalls bearbeitet; Cache und lokale Suchindizes werden anschließend neu aufgebaut. Ein laufender Import muss dafür nicht abgebrochen werden.
+
+Dies ist eine gezielte Bereinigung der Standardfelder, keine vollständige Anonymisierung sämtlicher Shopdaten. Dokumente/PDFs, Freitext, Custom Fields und Plugin-Daten können weiterhin personenbezogene Angaben enthalten.

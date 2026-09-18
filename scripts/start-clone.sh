@@ -20,6 +20,9 @@ unset SOURCE_SSH_PRIVATE_KEY SOURCE_SSH_KNOWN_HOSTS
 sudo install -d -o mysql -g mysql /var/run/mysqld
 if ! pgrep -x mysqld > /dev/null; then sudo rm -f /var/run/mysqld/mysqld.sock.lock; fi
 sudo service mysql start > /dev/null 2>&1
+clone_progress_start '[6/7] Anonymizing customer and order contact details'
+php "$scripts/anonymize-clone.php"
+clone_progress_done
 phase=$(jq -r '.phase' "$data/state.json")
 if [[ $phase == imported ]]; then
     source_php=$(jq -r '.php.selected' "$data/source-report.json")

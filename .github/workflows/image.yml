@@ -38,6 +38,7 @@ jobs:
       - name: Test source detection without a live shop
         run: |
           php -l scripts/progress.php
+          php -l scripts/anonymize-clone.php
           php -l scripts/check-rsync-error.php
           python3 tests/progress-test.py
           php -l scripts/detect-source.php
