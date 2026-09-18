@@ -25,7 +25,7 @@ clone_ssh_init() {
         local trust_dir=/var/lib/shopware-clone/ssh
         [[ -d /var/lib/shopware-clone && ! -L /var/lib/shopware-clone ]] || clone_fail 'Missing clone data directory.'
         [[ ! -L $trust_dir ]] || clone_fail 'Invalid SSH trust directory.'
-        mkdir -p -m 700 "$trust_dir"
+        mkdir -p "$trust_dir"
         chmod 700 "$trust_dir"
         known_hosts=$trust_dir/known_hosts
         [[ ! -L $known_hosts && ( ! -e $known_hosts || -f $known_hosts ) ]] || clone_fail 'Invalid SSH known_hosts file.'
