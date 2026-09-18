@@ -46,11 +46,10 @@ Die Mailoberfläche ist über `/mailcatcher` erreichbar. Dockware bringt auch `/
 |---|---|
 | MySQL in Dockware | Eigene Datenbank `shopware_clone` |
 | Redis 7.4 | Cache/Redis-Verbindungen; getrennte logische DBs für unterschiedliche Quell-DSNs |
-| OpenSearch 2.19.4 | Shops mit OpenSearch-PHP-Client |
-| Elasticsearch 7.17.28 | Unterstützter Elasticsearch-7-PHP-Client |
+| OpenSearch 2.19.4 | Lokale Suche für alle Kopien mit aktivierter Suche |
 | Mailfänger in Dockware | Standard-Mailversand der Kopie |
 
-Beide Suchserver laufen in dieser ersten Compose-Version mit je 512 MB Java-Heap, damit die Quelle erst zur Laufzeit ausgewählt werden kann. Ohne aktive Suche baut der Shop keine Indizes auf. Die Auswahl richtet sich nach dem mitkopierten PHP-Client, nicht nach einer Behauptung, dass alle Serverversionen austauschbar wären. Die drei Zusatzdienste liegen in einem internen Netzwerk pro Stack und haben eigene Volumes. Der Docker-Host benötigt für die Suchserver `vm.max_map_count >= 262144` und ausreichend RAM.
+Die Vorlage enthält nur OpenSearch als Suchdienst, mit 512 MB Java-Heap. Der Container wird mit dem Stack gestartet; der Shop verwendet ihn und baut Indizes nur auf, wenn die Quelle Suche aktiviert hat. Eine Auswahl anhand des PHP-Client-Pakets entfällt. Redis und OpenSearch liegen im internen Netzwerk des Stacks und haben eigene Volumes. Der Docker-Host benötigt für OpenSearch `vm.max_map_count >= 262144` und ausreichend RAM.
 
 ## Speicher und Wiederholungen
 
@@ -59,7 +58,7 @@ Beide Suchserver laufen in dieser ersten Compose-Version mit je 512 MB Java-Heap
 | `clone_data` | Shop unter `source/`, Konfigurationssicherungen, Status und private Logs |
 | `clone_db` | MySQL-Daten |
 | `clone_redis` | Lokaler Redis |
-| `clone_opensearch`, `clone_elasticsearch` | Lokale Indizes |
+| `clone_opensearch` | Lokale Suchindizes |
 
 Keine festen externen Volumenamen und keine gemeinsamen Bind-Mounts zwischen Shops verwenden. Für eine frische Kopie eine neue Ressource mit neuen Volumes anlegen; alte Wegwerfkopien samt zugehörigen Volumes anschließend bewusst löschen. Nach einem Abbruch während der Dateikopie kann der nächste Start vorhandene Dateien weiterverwenden, solange noch kein Dump und keine lokale Clone-Datenbank vorhanden sind. Spätere fehlgeschlagene Rohimporte benötigen frische Volumes. Nach Fehlern während der lokalen Konfiguration bleibt der Shop gestoppt; Details stehen in den privaten Logs. Nach einem Fehler beim Cache-/Theme-/Index-Aufbau kann ein Neustart diese Vorbereitungen erneut versuchen, ohne neu zu importieren.
 
@@ -109,3 +108,5 @@ Vor dem ersten Start ersetzt der Klon automatisch Namen und E-Mail-Adressen in `
 Der Schritt greift ausschließlich auf die lokale Datenbank `shopware_clone` zu. Er läuft einmal pro Kopie (`anonymized-v1.json`), damit spätere Teständerungen bei Neustarts erhalten bleiben. Bestehende Kopien werden beim ersten Start mit dem neuen Image ebenfalls bearbeitet; Cache und lokale Suchindizes werden anschließend neu aufgebaut. Ein laufender Import muss dafür nicht abgebrochen werden.
 
 Dies ist eine gezielte Bereinigung der Standardfelder, keine vollständige Anonymisierung sämtlicher Shopdaten. Dokumente/PDFs, Freitext, Custom Fields und Plugin-Daten können weiterhin personenbezogene Angaben enthalten.
+
+Beim Aktualisieren einer bestehenden Coolify-Ressource auch die Compose-Konfiguration anpassen: den Service `elasticsearch`, dessen Eintrag unter `shop.depends_on` und die Deklaration `clone_elasticsearch` entfernen. Ein Image-Pull allein ändert die Compose-Konfiguration nicht. Bereits konfigurierte Kopien behalten ihre gespeicherten Einstellungen; wenn eine alte Kopie tatsächlich Elasticsearch verwendet, muss ihre lokale Suchkonfiguration vor dem Entfernen dieses Dienstes auf OpenSearch umgestellt werden.

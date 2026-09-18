@@ -108,11 +108,8 @@ function configureClone(): void
     $adminSearch = $bool($effective['elasticsearch']['administration']['enabled'] ?? $env['SHOPWARE_ADMIN_ES_ENABLED'] ?? false);
     $lock = json_decode(file_get_contents($root . '/composer.lock'), true, 512, JSON_THROW_ON_ERROR);
     $packages = array_column($lock['packages'], 'version', 'name');
-    $engine = isset($packages['opensearch-project/opensearch-php']) ? 'opensearch' : 'elasticsearch';
-    if (($search || $adminSearch) && $engine === 'elasticsearch' && (!isset($packages['elasticsearch/elasticsearch']) || strpos(ltrim($packages['elasticsearch/elasticsearch'], 'v'), '7.') !== 0)) {
-        throw new RuntimeException('Search client requires an unsupported local engine.');
-    }
-    $endpoint = $engine === 'opensearch' ? 'http://opensearch:9200' : 'http://elasticsearch:9200';
+    $engine = 'opensearch';
+    $endpoint = 'http://opensearch:9200';
     $pdo = new PDO('mysql:unix_socket=/var/run/mysqld/mysqld.sock;dbname=shopware_clone;charset=utf8mb4', 'root', 'root', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     $dbVersion = $pdo->query('SELECT VERSION()')->fetchColumn();
     $dbUrl = 'mysql://root:root@127.0.0.1:3306/shopware_clone?charset=utf8mb4&serverVersion=' . rawurlencode($dbVersion);
