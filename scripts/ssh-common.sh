@@ -52,7 +52,7 @@ clone_ssh() { ssh -F "$clone_tmp/config" -T clone-source "$@"; }
 clone_ssh_cleanup() {
     if [[ -n ${clone_tmp:-} ]]; then
         rm -f -- "$clone_tmp/key" "$clone_tmp/known_hosts" "$clone_tmp/config" \
-            "$clone_tmp/result.json" "$clone_tmp/error" "$clone_tmp/mysql.cnf" "$clone_tmp/dump-bytes"
+            "$clone_tmp/result.json" "$clone_tmp/error" "$clone_tmp/mysql.cnf"
         rmdir -- "$clone_tmp"
     fi
 }

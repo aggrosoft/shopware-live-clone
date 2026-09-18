@@ -103,24 +103,20 @@ if ! php "$script_dir/validate-copy.php" "$clone_source"; then
 fi
 
 clone_progress_done
-printf '%s\n' '[4/7] Creating source database dump (total size unknown)...'
+clone_progress_start '[4/7] Creating source database dump'
 if ! clone_ssh "php -d display_errors=0 -d log_errors=0 -- '$clone_encoded_path'" \
-    < "$script_dir/source-database.php" 2> "$clone_tmp/error" | \
-    php "$script_dir/progress.php" stream "[4/7] Database dump" 0 "$clone_tmp/dump-bytes" | gzip -1 > "$clone_archive"; then
+    < "$script_dir/source-database.php" 2> "$clone_tmp/error" | gzip -1 > "$clone_archive"; then
     cp "$clone_tmp/error" "$clone_data/transfer-error.log"
     clone_fail 'Source dump failed. Check DATABASE_URL, dump privileges, InnoDB tables and disk space.'
 fi
-clone_progress_start '[4/7] Checking compressed dump'
-gzip -t "$clone_archive" 2> "$clone_tmp/error" || clone_fail 'Incomplete compressed database dump.'
 clone_progress_done
-printf '%s\n' '[5/7] Restoring local database (ETA estimates SQL stream delivery)...'
+# gzip validates its checksum while streaming the restore; no second full read.
+printf '%s\n' '[5/7] Restoring local database...'
 local_mysql -e 'CREATE DATABASE shopware_clone CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' \
     2> "$clone_tmp/error" || clone_fail 'Could not create the local clone database.'
 # --binary-mode disables mysql client commands in the input dump.
 clone_progress_start "[5/7] Executing SQL in local database"
-if ! gzip -dc "$clone_archive" | \
-    php "$script_dir/progress.php" stream "[5/7] Database restore" "$(cat "$clone_tmp/dump-bytes")" | \
-    local_mysql --binary-mode=1 shopware_clone > /dev/null 2> "$clone_tmp/error"; then
+if ! gzip -dc "$clone_archive" | local_mysql --binary-mode=1 shopware_clone > /dev/null 2> "$clone_tmp/error"; then
     clone_fail 'Local restore failed (for example an incompatible source collation). No shop services were started.'
 fi
 clone_progress_done

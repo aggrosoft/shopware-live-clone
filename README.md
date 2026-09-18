@@ -100,7 +100,7 @@ Quellen: [Dockware](https://github.com/dockware/shopware), [Shopware](https://gi
 
 ### Import progress
 
-Container logs show seven setup phases. File copying and SQL restore report bytes, average throughput, percentage and an approximate remaining time every 15 seconds. Rsync first scans the complete file list to make its percentage meaningful. Estimates cover the current phase only, not the complete clone startup. SQL restore progress measures SQL delivered to MySQL; final execution may take longer. Database dumps have no known total size and show bytes and elapsed time. Validation, configuration, cache/theme compilation and search indexing emit a heartbeat every 15 seconds. Detailed command output stays in the private log files. Updates apply to new containers; let an already running import finish before deploying a new image.
+Container logs show seven setup phases. File copying reports bytes, average throughput, percentage and an approximate remaining time every 15 seconds. Rsync first scans the complete file list to make its percentage meaningful. Estimates cover file copying only, not the complete clone startup. Database dump and restore use direct SSH/gzip/mysql pipelines without a progress filter; a separate heartbeat reports elapsed time. The gzip checksum is checked during restore without an additional full decompression pass. Validation, configuration, cache/theme compilation and search indexing also emit a heartbeat every 15 seconds. Detailed command output stays in the private log files. Updates apply to new containers; let an already running import finish before deploying a new image.
 
 ## Einfache Anonymisierung
 
