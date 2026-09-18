@@ -97,3 +97,7 @@ GitHub Actions prüft Shell/PHP, Konfigurationsfälle und Compose, baut das Imag
 Tags: `main`, `sha-<commit>` und gegebenenfalls Release-Tags. Plattform zunächst linux/amd64. Keine Live-Daten oder Zugangsdaten gelangen in den Image-Build. Es wurde noch kein echter Hetzner-Kundenshop getestet.
 
 Quellen: [Dockware](https://github.com/dockware/shopware), [Shopware](https://github.com/shopware/shopware).
+
+### Import progress
+
+Container logs show seven setup phases. File copying and SQL restore report bytes, average throughput, percentage and an approximate remaining time every 15 seconds. Rsync first scans the complete file list to make its percentage meaningful. Estimates cover the current phase only, not the complete clone startup. SQL restore progress measures SQL delivered to MySQL; final execution may take longer. Database dumps have no known total size and show bytes and elapsed time. Validation, configuration, cache/theme compilation and search indexing emit a heartbeat every 15 seconds. Detailed command output stays in the private log files. Updates apply to new containers; let an already running import finish before deploying a new image.

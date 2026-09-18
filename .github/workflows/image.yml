@@ -37,6 +37,8 @@ jobs:
 
       - name: Test source detection without a live shop
         run: |
+          php -l scripts/progress.php
+          python3 tests/progress-test.py
           php -l scripts/detect-source.php
           php tests/detect-source-test.php
           php -l scripts/source-database.php
