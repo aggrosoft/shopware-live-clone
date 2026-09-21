@@ -60,6 +60,7 @@ jobs:
           SOURCE_SSH_USER: fixture
           SOURCE_SSH_PRIVATE_KEY: fixture
           SOURCE_SHOP_PATH: /shop
+          SSH_PASSWORD: fixture
           SERVICE_URL_SHOP_80: https://test.example.org
           SERVICE_FQDN_SHOP_80: test.example.org
         run: docker compose config --quiet
