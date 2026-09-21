@@ -5,6 +5,7 @@ services:
     networks: [default, backend]
     environment:
       SERVICE_URL_SHOP_80: /
+      SERVICE_FQDN_SHOP: null
       CLONE_URL: https://${SERVICE_FQDN_SHOP_80}
       SOURCE_URL: ${SOURCE_URL:?Set the exact live sales-channel URL}
       SOURCE_SSH_HOST: ${SOURCE_SSH_HOST:?Set SSH host}
@@ -16,7 +17,7 @@ services:
       CLONE_DATABASE_HOST: database
       SSH_PASSWORD: ${SSH_PASSWORD:?Set SSH password}
     labels:
-      - sshpiper.username=${SERVICE_FQDN_SHOP_80}
+      - sshpiper.username=${SERVICE_FQDN_SHOP}
       - sshpiper.container_username=dockware
       - sshpiper.port=22
     volumes:
