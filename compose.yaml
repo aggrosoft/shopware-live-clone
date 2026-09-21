@@ -14,6 +14,11 @@ services:
       SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:-}
       SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
       CLONE_DATABASE_HOST: database
+      SSH_PASSWORD: ${SSH_PASSWORD:?Set SSH password}
+    labels:
+      - sshpiper.username=${SERVICE_FQDN_SHOP_80}
+      - sshpiper.container_username=dockware
+      - sshpiper.port=22
     volumes:
       - clone_data:/var/lib/shopware-clone
     depends_on:
