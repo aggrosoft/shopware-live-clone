@@ -20,6 +20,7 @@ services:
       - sshpiper.username=${SERVICE_FQDN_SHOP}
       - sshpiper.container_username=dockware
       - sshpiper.port=22
+      - sshpiper.network=${COMPOSE_PROJECT_NAME}
     volumes:
       - clone_data:/var/lib/shopware-clone
     depends_on:
