@@ -67,6 +67,11 @@ fi
 php_version=$(jq -r '.php' "$data/runtime.json")
 [[ $php_version =~ ^8\.[2345]$ ]] || { echo 'Unsupported PHP version.' >&2; exit 1; }
 
+# Never reactivate copied live canonical-domain, alias or HTTPS redirect rules.
+# This also upgrades already configured clone volumes when a new image starts.
+install -m 0644 "$scripts/clone-public.htaccess" "$root/public/.htaccess"
+printf '%s\n' '# Live hosting rules are disabled in the disposable clone.' > "$root/.htaccess"
+
 # Known local overrides only; original live credentials are never exported here.
 # shellcheck disable=SC1091
 source "$data/runtime.sh"

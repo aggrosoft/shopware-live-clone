@@ -9,6 +9,7 @@ for executable in bash ssh rsync mysql mysqldump jq gzip flock sudo timeout base
 done
 
 test -r /entrypoint.sh
+test -r /opt/shopware-live-clone/clone-public.htaccess
 if grep -Eq '^[[:space:]]*sudo service mysql start' /entrypoint.sh; then
     printf '%s\n' 'Dockware would start its bundled MySQL despite the external MariaDB service.' >&2
     exit 1
