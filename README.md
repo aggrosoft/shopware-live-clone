@@ -20,6 +20,9 @@ Wegwerf-Testkopien bestehender Shopware-Shops auf Basis von Dockware Essentials 
 | `SOURCE_SHOP_PATH` | Absoluter Projektordner mit `composer.lock` und `bin/console`, nicht `public` |
 | `SOURCE_URL` | Exakte Haupt-Verkaufskanal-URL der Quelle, einschließlich http/https und gegebenenfalls Unterpfad |
 | `CLONE_URL` | Wird in der Compose-Vorlage aus der Coolify-Domain übernommen |
+| `SSH_PASSWORD` | Passwort für den Benutzer `dockware` im geklonten Shop |
+
+Der Shop-Service trägt die vom vorhandenen SSH-Piper verwendeten Labels. Als externer SSH-Piper-Benutzername dient `SERVICE_FQDN_SHOP_80`, im Container wird auf `dockware:22` weitergeleitet. Der Aufruf entspricht damit den normalen Dev-Shops: `ssh <Clone-FQDN>@<SSH-Piper-Host>`. Das Passwort kommt ausschließlich aus `SSH_PASSWORD` der Coolify-Ressource und wird nicht ins Image geschrieben.
 
 Ohne `SOURCE_SSH_KNOWN_HOSTS` wird der SSH-Hostschlüssel beim ersten Kontakt automatisch akzeptiert (`accept-new`) und unter `/var/lib/shopware-clone/ssh/known_hosts` im Volume `clone_data` gespeichert. Weitere Verbindungen verwenden diesen gespeicherten Schlüssel; ein geänderter Schlüssel wird abgelehnt. Beim ersten Kontakt findet keine unabhängige Identitätsprüfung statt. Mit neuen Volumes beginnt auch die Vertrauensprüfung von vorn. Eine explizite ENV-Vorgabe hat Vorrang und verwendet weiterhin strikte Prüfung.
 
