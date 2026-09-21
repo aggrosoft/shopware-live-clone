@@ -13,6 +13,35 @@ function cloneUrl(string $url): string
     return rtrim($url, '/');
 }
 
+function clonePublicHtaccess(): string
+{
+    return <<<'HTACCESS'
+# Generated for the disposable clone. Live canonical-domain and hosting rules
+# are intentionally not copied.
+DirectoryIndex index.php
+
+<IfModule mod_negotiation.c>
+    Options -MultiViews
+</IfModule>
+
+<IfModule mod_setenvif.c>
+    SetEnvIf X-Forwarded-Proto "^https$" HTTPS=on
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Keep bearer/basic authorization available to Shopware and its API.
+    RewriteCond %{HTTP:Authorization} .+
+    RewriteRule ^ - [E=HTTP_AUTHORIZATION:%0]
+
+    # Existing public files are served by Apache; everything else enters Shopware.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+HTACCESS;
+}
+
 function cloneDomainMap(array $rows, string $source, string $target): array
 {
     $source = cloneUrl($source);
@@ -201,9 +230,14 @@ function configureClone(): void
         $extra['elasticsearch'] = ['hosts' => $endpoint, 'enabled' => $search, 'indexing_enabled' => $search, 'index_prefix' => 'clone', 'index_settings' => ['number_of_replicas' => 0], 'administration' => ['hosts' => $endpoint, 'enabled' => $adminSearch, 'index_prefix' => 'clone-admin', 'index_settings' => ['number_of_replicas' => 0]]];
     }
     $save($root . '/config/packages/prod/zzzz_clone.yaml', $yamlClass::dump($extra, 20, 2));
-    foreach (['.htaccess', 'public/.htaccess', 'public/.htaccess.watch', 'public/.user.ini'] as $name) {
+    $save($root . '/public/.htaccess', clonePublicHtaccess() . "\n");
+    foreach (['.htaccess', 'public/.htaccess.watch', 'public/.user.ini'] as $name) {
         $path = $root . '/' . $name;
         if (!is_file($path)) { continue; }
+        if ($name === '.htaccess') {
+            $save($path, "# Live hosting rules are disabled in the disposable clone.\n");
+            continue;
+        }
         $contents = file_get_contents($path);
         if (substr($name, -9) !== '.user.ini') {
             $contents = preg_replace('/^\s*(?:AddHandler|SetHandler|Action)\s+[^\r\n]*php[^\r\n]*$/mi', '# PHP handler supplied by clone runtime', $contents);

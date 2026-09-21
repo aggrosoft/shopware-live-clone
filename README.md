@@ -7,7 +7,7 @@ Wegwerf-Testkopien bestehender Shopware-Shops auf Basis von Dockware Essentials 
 1. Neue **Docker Compose**-Ressource anlegen und `compose.yaml` aus diesem Repository einfügen.
 2. Das öffentliche Image `ghcr.io/aggrosoft/shopware-live-clone:main` verwenden; ein GHCR-Registry-Zugang ist nicht nötig.
 3. Die folgenden Variablen setzen. Private Keys nicht ins Repository oder als Build-Argument speichern.
-4. Eine Testdomain für den Service `shop`, Port 80, vergeben. Coolify stellt sie über `SERVICE_URL_SHOP_80` bereit; daraus wird `CLONE_URL`.
+4. Eine Testdomain für den Service `shop`, Port 80, vergeben. Coolify stellt den Host über `SERVICE_FQDN_SHOP_80` bereit; daraus wird die externe HTTPS-URL ohne den internen Zielport gebildet.
 5. Deployen und die Phasen im Containerlog verfolgen. Der erste Import kann bei großen Shops lange dauern.
 
 | Variable | Inhalt |

@@ -23,4 +23,8 @@ foreach (['https://user@host', 'https://user:pass@host', 'file:///tmp/test', 'ht
     try { cloneUrl($url); } catch (RuntimeException $expected) { $rejected = true; }
     $check($rejected, 'Invalid URL accepted.');
 }
+$htaccess = clonePublicHtaccess();
+$check(strpos($htaccess, 'RewriteRule ^ index.php [L]') !== false, 'Clone Apache config routes through Shopware.');
+$check(strpos($htaccess, 'X-Forwarded-Proto') !== false, 'Clone Apache config recognizes proxy HTTPS.');
+$check(strpos($htaccess, 'HTTP_HOST') === false, 'Clone Apache config contains no canonical-host redirect.');
 echo "Clone URL configuration tests: OK\n";

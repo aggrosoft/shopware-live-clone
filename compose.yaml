@@ -5,7 +5,7 @@ services:
     networks: [default, backend]
     environment:
       SERVICE_URL_SHOP_80: /
-      CLONE_URL: ${SERVICE_URL_SHOP_80}
+      CLONE_URL: https://${SERVICE_FQDN_SHOP_80}
       SOURCE_URL: ${SOURCE_URL:?Set the exact live sales-channel URL}
       SOURCE_SSH_HOST: ${SOURCE_SSH_HOST:?Set SSH host}
       SOURCE_SSH_PORT: ${SOURCE_SSH_PORT:-22}
