@@ -137,6 +137,9 @@ fi
 # Provision process definitions on every container creation, without touching shop data.
 sudo cp "$scripts/clone-worker.conf" /etc/supervisor/conf.d/clone-worker.conf
 crontab "$scripts/clone-crontab"
+if [[ -n ${SSH_PASSWORD:-} ]]; then
+    printf 'dockware:%s\n' "$SSH_PASSWORD" | sudo chpasswd
+fi
 cd "$root"
 printf 'Clone setup complete after %ss of this startup. Starting Dockware, cron and queue workers; waiting for health check...\n' "$SECONDS"
 exec /bin/bash /entrypoint.sh
