@@ -9,6 +9,12 @@ scripts=/opt/shopware-live-clone
 source "$scripts/progress.sh"
 trap clone_progress_stop EXIT
 [[ -n ${CLONE_URL:-} && -n ${SOURCE_URL:-} ]] || { echo 'Set CLONE_URL (Coolify target URL) and SOURCE_URL.' >&2; exit 78; }
+# Older Coolify templates combined an HTTPS scheme with the internal service port.
+# Normalize that legacy value before configuring or validating a persisted clone.
+if [[ $CLONE_URL =~ ^https://([^/:]+):80(/.*)?$ ]]; then
+    CLONE_URL="https://${BASH_REMATCH[1]}${BASH_REMATCH[2]:-}"
+    export CLONE_URL
+fi
 startup_exit() {
     local status=$?
     clone_progress_stop
@@ -50,6 +56,7 @@ for ((attempt=0; attempt<60; attempt++)); do
     sleep 2
 done
 [[ $database_ready == 1 ]] || { echo 'Clone MariaDB did not become ready.' >&2; exit 1; }
+php "$scripts/migrate-clone-url.php"
 clone_progress_start '[6/7] Anonymizing customer and order contact details'
 php "$scripts/anonymize-clone.php"
 clone_progress_done
@@ -81,6 +88,16 @@ export APACHE_DOCROOT="$root/public"
 export SHOP_DOMAIN=localhost SW_TASKS_ENABLED=0 SUPERVISOR_ENABLED=1
 export RECOVERY_MODE=0 FILEBEAT_ENABLED=0
 unset DOCKWARE_CI
+
+if [[ -f $data/url-migrated ]]; then
+    clone_progress_start '[7/7] Clearing cache after clone URL correction'
+    if ! "php$php_version" "$root/bin/console" cache:clear --no-interaction >> "$data/setup.log" 2>&1; then
+        printf '%s\n' 'Cache clear after clone URL correction failed. Details: /var/lib/shopware-clone/setup.log' >&2
+        exit 1
+    fi
+    rm -f "$data/url-migrated"
+    clone_progress_done
+fi
 
 if [[ $phase == configured ]]; then
     printf '%s\n' 'Preparing copied Shopware (logs are stored privately)...'
