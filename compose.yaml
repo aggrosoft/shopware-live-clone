@@ -15,8 +15,10 @@ services:
       SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:-}
       SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
       CLONE_DATABASE_HOST: database
+      INTERNAL_STOREFRONT_ORIGIN: http://shop
       SSH_PASSWORD: ${SSH_PASSWORD:?Set SSH password}
     labels:
+      - coolify.traefik.middlewares=authentik-forward-auth@file
       - sshpiper.username=${SERVICE_FQDN_SHOP}
       - sshpiper.container_username=dockware
       - sshpiper.port=22

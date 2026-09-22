@@ -13,6 +13,8 @@ $check($mapped[0]['target'] === 'https://test.example.org', 'Main domain mapped.
 $check($mapped[1]['target'] === 'https://test.example.org/en', 'Language path preserved.');
 $check(count(array_unique(array_column($mapped, 'target'))) === 4, 'Aliases and secondary channels remain distinct.');
 $check(strpos($mapped[3]['target'], 'https://test.example.org/__clone/') === 0, 'Secondary channel stays on target host.');
+$check(internalCloneDomainUrl('https://test.example.org', 'https://test.example.org', 'http://shop') === 'http://shop', 'Main internal domain mapped.');
+$check(internalCloneDomainUrl('https://test.example.org/en', 'https://test.example.org', 'http://shop') === 'http://shop/en', 'Internal language path preserved.');
 $subpath = cloneDomainMap([['id' => '1', 'url' => 'https://live.example.org/shop'], ['id' => '2', 'url' => 'https://live.example.org/shop/en']], 'https://live.example.org/shop', 'https://test.example.org');
 $check($subpath[1]['target'] === 'https://test.example.org/en', 'Source subdirectory stripped.');
 $legacy = cloneDomainMap([['id' => '1', 'url' => 'localhost'], ['id' => '2', 'url' => ''], ['id' => '3', 'url' => '%env(APP_URL)%']], 'http://localhost', 'https://test.example.org');

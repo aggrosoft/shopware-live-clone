@@ -55,6 +55,84 @@ function cloneDomainMap(array $rows, string $source, string $target): array
     return $result;
 }
 
+function internalCloneDomainUrl(string $externalUrl, string $externalBase, string $internalBase): string
+{
+    $externalUrl = cloneUrl($externalUrl);
+    $externalBase = cloneUrl($externalBase);
+    $internalBase = cloneUrl($internalBase);
+
+    if ($externalUrl === $externalBase) {
+        return $internalBase;
+    }
+
+    if (strpos($externalUrl, $externalBase . '/') === 0) {
+        return $internalBase . substr($externalUrl, strlen($externalBase));
+    }
+
+    throw new RuntimeException('Clone domain is outside the configured clone URL.');
+}
+
+function cloneInternalSalesChannelDomain(PDO $pdo, string $sourceId, string $internalUrl): bool
+{
+    $exists = $pdo->prepare('SELECT 1 FROM sales_channel_domain WHERE url=?');
+    $exists->execute([$internalUrl]);
+    if ($exists->fetchColumn()) {
+        return false;
+    }
+
+    $statement = $pdo->prepare('SELECT * FROM sales_channel_domain WHERE id=UNHEX(?)');
+    $statement->execute([$sourceId]);
+    $source = $statement->fetch(PDO::FETCH_ASSOC);
+    if (!$source) {
+        throw new RuntimeException('Source sales-channel domain disappeared during clone configuration.');
+    }
+
+    $columns = $pdo->query('SHOW FULL COLUMNS FROM sales_channel_domain')->fetchAll(PDO::FETCH_ASSOC);
+    $insert = [];
+
+    foreach ($columns as $column) {
+        $name = (string) $column['Field'];
+        $extra = (string) ($column['Extra'] ?? '');
+
+        if (stripos($extra, 'GENERATED') !== false) {
+            continue;
+        }
+
+        if ($name === 'id') {
+            $insert[$name] = md5("aggro-internal-domain\0" . $sourceId . "\0" . $internalUrl, true);
+            continue;
+        }
+
+        if ($name === 'url') {
+            $insert[$name] = $internalUrl;
+            continue;
+        }
+
+        if ($name === 'is_external_storefront') {
+            $insert[$name] = 0;
+            continue;
+        }
+
+        $insert[$name] = $source[$name] ?? null;
+    }
+
+    $tick = chr(96);
+    $quotedColumns = array_map(
+        static fn (string $column): string => $tick . str_replace($tick, $tick . $tick, $column) . $tick,
+        array_keys($insert)
+    );
+    $placeholders = array_fill(0, count($insert), '?');
+
+    $statement = $pdo->prepare(sprintf(
+        'INSERT INTO sales_channel_domain (%s) VALUES (%s)',
+        implode(', ', $quotedColumns),
+        implode(', ', $placeholders)
+    ));
+    $statement->execute(array_values($insert));
+
+    return true;
+}
+
 function configureClone(): void
 {
     $data = '/var/lib/shopware-clone';
@@ -229,6 +307,14 @@ function configureClone(): void
         $stmt = $pdo->prepare('UPDATE sales_channel_domain SET url=? WHERE id=UNHEX(?)');
         $stmt->execute([$row['target'], $row['id']]);
     }
+
+    $internalOrigin = cloneUrl(getenv('INTERNAL_STOREFRONT_ORIGIN') ?: 'http://shop');
+    foreach ($domainMap as &$row) {
+        $internalUrl = internalCloneDomainUrl($row['target'], $target, $internalOrigin);
+        cloneInternalSalesChannelDomain($pdo, $row['id'], $internalUrl);
+        $row['internal'] = $internalUrl;
+    }
+    unset($row);
     $pdo->exec("UPDATE system_config SET configuration_value='{\"_value\":\"\"}' WHERE configuration_key='core.mailerSettings.emailAgent'");
     $tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
     foreach (['messenger_messages', 'elasticsearch_index_task'] as $table) {

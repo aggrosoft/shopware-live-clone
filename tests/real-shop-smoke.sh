@@ -81,6 +81,8 @@ docker run -d --name clone-ci-target --network clone-ci \
     "$image"
 wait_healthy clone-ci-target
 docker exec clone-ci-target curl -fsS -o /dev/null -H 'Host: clone.example.org' http://127.0.0.1/
+test "$(docker exec -e MYSQL_PWD=root clone-ci-target mysql --no-defaults --protocol=TCP -h database -u root -N -B shopware_clone -e "SELECT COUNT(*) FROM sales_channel_domain WHERE url='http://shop'")" = 1
+docker exec clone-ci-target curl -fsS -o /dev/null -H 'Host: shop' http://127.0.0.1/
 docker exec clone-ci-target sudo supervisorctl status 'clone-worker:*'
 docker exec clone-ci-target crontab -l
 test "$(docker exec -e MYSQL_PWD=root clone-ci-target mysql --no-defaults --protocol=TCP -h database -u root -N -B shopware_clone -e "SELECT COUNT(*) FROM messenger_messages WHERE body='LIVE_QUEUE_SENTINEL'")" = 0

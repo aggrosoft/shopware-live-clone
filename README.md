@@ -60,8 +60,9 @@ hosting account. Store the private key only in the Coolify environment configura
 1. Create a Docker Compose resource in Coolify.
 2. Use the repository's [`compose.yaml`](compose.yaml).
 3. Assign an HTTPS domain to service `shop` on container port `80`.
-4. Configure the required environment variables below.
-5. Deploy and follow the `shop` service logs.
+4. Ensure the server-level Traefik middleware `authentik-forward-auth@file` exists; the Compose file applies it to the public clone route by default.
+5. Configure the required environment variables below.
+6. Deploy and follow the `shop` service logs.
 
 The GHCR image is public. No registry credentials are required.
 
@@ -118,7 +119,7 @@ The configurator applies the following changes to the copied environment:
 | Area | Clone behavior |
 |---|---|
 | Database | All standard Doctrine configuration points to local MariaDB |
-| Domains | The primary source URL becomes `CLONE_URL`; other domains receive paths below `/__clone/` |
+| Domains | The primary source URL becomes `CLONE_URL`; other domains receive paths below `/__clone/`. Every clone domain is also mirrored onto the internal `http://shop` origin for Docker-network browser checks. |
 | Redirects | Copied root and public `.htaccess` redirect rules are replaced |
 | Redis | Redis DSNs are mapped to isolated logical databases on local Redis |
 | Search | Enabled storefront and administration search use local OpenSearch |
