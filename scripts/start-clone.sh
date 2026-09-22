@@ -57,6 +57,7 @@ for ((attempt=0; attempt<60; attempt++)); do
 done
 [[ $database_ready == 1 ]] || { echo 'Clone MariaDB did not become ready.' >&2; exit 1; }
 php "$scripts/migrate-clone-url.php"
+php "$scripts/ensure-internal-domains.php"
 clone_progress_start '[6/7] Anonymizing customer and order contact details'
 php "$scripts/anonymize-clone.php"
 clone_progress_done
@@ -89,13 +90,13 @@ export SHOP_DOMAIN=localhost SW_TASKS_ENABLED=0 SUPERVISOR_ENABLED=1
 export RECOVERY_MODE=0 FILEBEAT_ENABLED=0
 unset DOCKWARE_CI
 
-if [[ -f $data/url-migrated ]]; then
-    clone_progress_start '[7/7] Clearing cache after clone URL correction'
+if [[ -f $data/url-migrated || -f $data/internal-domains-migrated ]]; then
+    clone_progress_start '[7/7] Clearing cache after clone runtime migration'
     if ! "php$php_version" "$root/bin/console" cache:clear --no-interaction >> "$data/setup.log" 2>&1; then
         printf '%s\n' 'Cache clear after clone URL correction failed. Details: /var/lib/shopware-clone/setup.log' >&2
         exit 1
     fi
-    rm -f "$data/url-migrated"
+    rm -f "$data/url-migrated" "$data/internal-domains-migrated"
     clone_progress_done
 fi
 
