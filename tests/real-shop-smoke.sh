@@ -82,7 +82,10 @@ docker run -d --name clone-ci-target --network clone-ci \
 wait_healthy clone-ci-target
 test "$(docker exec clone-ci-target php -r '$env = require "/var/lib/shopware-clone/source/.env.local.php"; echo ($env["APP_ENV"] ?? "") . ":" . ($env["APP_DEBUG"] ?? "");')" = 'dev:1'
 docker exec clone-ci-target test -f /var/lib/shopware-clone/source/config/packages/dev/zzzz_clone.yaml
-! docker exec clone-ci-target grep -Eq '^export APP_(ENV|DEBUG)=' /var/lib/shopware-clone/runtime.sh
+if docker exec clone-ci-target grep -Eq '^export APP_(ENV|DEBUG)=' /var/lib/shopware-clone/runtime.sh; then
+    echo 'runtime.sh must not persist APP_ENV or APP_DEBUG' >&2
+    exit 1
+fi
 docker exec clone-ci-target curl -fsS -o /dev/null -H 'Host: clone.example.org' http://127.0.0.1/
 test "$(docker exec -e MYSQL_PWD=root clone-ci-target mysql --no-defaults --protocol=TCP -h database -u root -N -B shopware_clone -e "SELECT COUNT(*) FROM sales_channel_domain WHERE url='http://shop'")" = 1
 docker exec clone-ci-target curl -fsS -o /dev/null -H 'Host: shop' http://127.0.0.1/
@@ -103,6 +106,9 @@ wait_healthy clone-ci-target
 test "$(docker exec clone-ci-target cat /var/lib/shopware-clone/source/clone-ci-marker)" = retained
 test "$(docker exec clone-ci-target php -r '$env = require "/var/lib/shopware-clone/source/.env.local.php"; echo ($env["APP_ENV"] ?? "") . ":" . ($env["APP_DEBUG"] ?? "");')" = 'dev:1'
 docker exec clone-ci-target test -f /var/lib/shopware-clone/source/config/packages/dev/zzzz_clone.yaml
-! docker exec clone-ci-target grep -Eq '^export APP_(ENV|DEBUG)=' /var/lib/shopware-clone/runtime.sh
+if docker exec clone-ci-target grep -Eq '^export APP_(ENV|DEBUG)=' /var/lib/shopware-clone/runtime.sh; then
+    echo 'runtime.sh must not persist APP_ENV or APP_DEBUG' >&2
+    exit 1
+fi
 docker exec clone-ci-target curl -fsS -o /dev/null -H 'Host: clone.example.org' http://127.0.0.1/
 echo 'Real Shopware import, OpenSearch indexing, Redis, storefront, mail capture, workers and restart without source: OK'

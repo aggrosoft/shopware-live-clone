@@ -108,6 +108,8 @@ export PHP_VERSION="$php_version" APP_ENV="$runtime_app_env" APP_DEBUG="$runtime
 # process environment is sanitized by Apache. Keep its runtime mode aligned with
 # the container without changing any of the clone-specific connection rewrites.
 if [[ -f $root/.env.local.php ]]; then
+    # The single-quoted argument is PHP source and must not be expanded by Bash.
+    # shellcheck disable=SC2016
     "php$php_version" -r '
         $path = $argv[1];
         $env = require $path;
