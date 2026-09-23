@@ -80,17 +80,54 @@ php_version=$(jq -r '.php' "$data/runtime.json")
 install -m 0644 "$scripts/clone-public.htaccess" "$root/public/.htaccess"
 printf '%s\n' '# Live hosting rules are disabled in the disposable clone.' > "$root/.htaccess"
 
+# APP_ENV/APP_DEBUG belong to the container runtime. Older clone volumes persisted
+# prod values in runtime.sh and only generated prod package overrides; migrate them
+# on startup so an existing clone switches cleanly to dev after a redeploy.
+runtime_app_env=${APP_ENV:-dev}
+runtime_app_debug=${APP_DEBUG:-}
+if [[ -z $runtime_app_debug ]]; then
+    if [[ $runtime_app_env == dev ]]; then runtime_app_debug=1; else runtime_app_debug=0; fi
+fi
+runtime_env_migrated=0
+if [[ -f $data/runtime.sh ]] && grep -Eq '^export APP_(ENV|DEBUG)=' "$data/runtime.sh"; then
+    sed -i '/^export APP_ENV=/d; /^export APP_DEBUG=/d' "$data/runtime.sh"
+    runtime_env_migrated=1
+fi
+if [[ -f $root/config/packages/prod/zzzz_clone.yaml && ! -f $root/config/packages/dev/zzzz_clone.yaml ]]; then
+    mkdir -p "$root/config/packages/dev"
+    cp "$root/config/packages/prod/zzzz_clone.yaml" "$root/config/packages/dev/zzzz_clone.yaml"
+    runtime_env_migrated=1
+fi
+
 # Known local overrides only; original live credentials are never exported here.
 # shellcheck disable=SC1091
 source "$data/runtime.sh"
-export PHP_VERSION=$php_version APP_ENV=prod APP_DEBUG=0
+export PHP_VERSION="$php_version" APP_ENV="$runtime_app_env" APP_DEBUG="$runtime_app_debug"
+
+# .env.local.php is copied from the live shop and used by web requests when the
+# process environment is sanitized by Apache. Keep its runtime mode aligned with
+# the container without changing any of the clone-specific connection rewrites.
+if [[ -f $root/.env.local.php ]]; then
+    "php$php_version" -r '
+        $path = $argv[1];
+        $env = require $path;
+        if (!is_array($env)) { fwrite(STDERR, "Invalid compiled clone environment.\n"); exit(1); }
+        $appEnv = getenv("APP_ENV");
+        $appDebug = getenv("APP_DEBUG");
+        if (($env["APP_ENV"] ?? null) === $appEnv && ($env["APP_DEBUG"] ?? null) === $appDebug) { exit(0); }
+        $env["APP_ENV"] = $appEnv;
+        $env["APP_DEBUG"] = $appDebug;
+        $tmp = $path . ".clone-runtime";
+        if (file_put_contents($tmp, "<?php\nreturn " . var_export($env, true) . ";\n") === false || !rename($tmp, $path)) { exit(1); }
+    ' "$root/.env.local.php"
+fi
 export APACHE_DOCROOT="$root/public"
 # Domain changes are handled per channel by our configurator, not Dockware's bulk rewrite.
 export SHOP_DOMAIN=localhost SW_TASKS_ENABLED=0 SUPERVISOR_ENABLED=1
 export RECOVERY_MODE=0 FILEBEAT_ENABLED=0
 unset DOCKWARE_CI
 
-if [[ -f $data/url-migrated || -f $data/internal-domains-migrated ]]; then
+if [[ -f $data/url-migrated || -f $data/internal-domains-migrated || $runtime_env_migrated == 1 ]]; then
     clone_progress_start '[7/7] Clearing cache after clone runtime migration'
     if ! "php$php_version" "$root/bin/console" cache:clear --no-interaction >> "$data/setup.log" 2>&1; then
         printf '%s\n' 'Cache clear after clone URL correction failed. Details: /var/lib/shopware-clone/setup.log' >&2

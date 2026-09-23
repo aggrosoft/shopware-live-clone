@@ -15,6 +15,8 @@ services:
       SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:-}
       SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
       CLONE_DATABASE_HOST: database
+      APP_ENV: ${APP_ENV:-dev}
+      APP_DEBUG: ${APP_DEBUG:-1}
       INTERNAL_STOREFRONT_ORIGIN: http://shop
       SSH_PASSWORD: ${SSH_PASSWORD:?Set SSH password}
     labels:

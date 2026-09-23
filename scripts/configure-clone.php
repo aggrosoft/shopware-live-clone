@@ -213,7 +213,7 @@ function configureClone(): void
         if (is_string($value)) { $env[$key] = $rewrite($value); }
     }
     $overrides = [
-        'APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'APP_URL' => $target, 'DATABASE_URL' => $dbUrl,
+        'APP_URL' => $target, 'DATABASE_URL' => $dbUrl,
         'MAILER_DSN' => 'smtp://127.0.0.1:1025', 'MAILER_URL' => 'smtp://127.0.0.1:1025',
         'OPENSEARCH_URL' => $endpoint, 'ADMIN_OPENSEARCH_URL' => $endpoint, 'SHOPWARE_ES_HOSTS' => $endpoint, 'SHOPWARE_ADMIN_ES_HOSTS' => $endpoint,
         'SHOPWARE_ES_ENABLED' => $search ? '1' : '0', 'SHOPWARE_ES_INDEXING_ENABLED' => $search ? '1' : '0',
@@ -285,7 +285,9 @@ function configureClone(): void
     if (isset($packages['shopware/elasticsearch'])) {
         $extra['elasticsearch'] = ['hosts' => $endpoint, 'enabled' => $search, 'indexing_enabled' => $search, 'index_prefix' => 'clone', 'index_settings' => ['number_of_replicas' => 0], 'administration' => ['hosts' => $endpoint, 'enabled' => $adminSearch, 'index_prefix' => 'clone-admin', 'index_settings' => ['number_of_replicas' => 0]]];
     }
-    $save($root . '/config/packages/prod/zzzz_clone.yaml', $yamlClass::dump($extra, 20, 2));
+    $cloneConfig = $yamlClass::dump($extra, 20, 2);
+    $save($root . '/config/packages/prod/zzzz_clone.yaml', $cloneConfig);
+    $save($root . '/config/packages/dev/zzzz_clone.yaml', $cloneConfig);
     $save($root . '/public/.htaccess', clonePublicHtaccess() . "\n");
     foreach (['.htaccess', 'public/.htaccess.watch', 'public/.user.ini'] as $name) {
         $path = $root . '/' . $name;
