@@ -59,10 +59,11 @@ hosting account. Store the private key only in the Coolify environment configura
 
 1. Create a Docker Compose resource in Coolify.
 2. Use the repository's [`compose.yaml`](compose.yaml).
-3. Assign an HTTPS domain to service `shop` on container port `80`.
-4. Ensure the server-level Traefik middleware `authentik-forward-auth@file` exists; the Compose file applies it to the public clone route by default.
-5. Configure the required environment variables below.
-6. Deploy and follow the `shop` service logs.
+3. Disable **Escape special characters in labels** for the Coolify resource so SSHPiper variable interpolation remains intact.
+4. Assign an HTTPS domain to service `shop` on container port `80`.
+5. Ensure the server-level Traefik middleware `authentik-forward-auth@file` exists; the Compose file applies it to the public clone route by default.
+6. Configure the required environment variables below.
+7. Deploy and follow the `shop` service logs.
 
 The GHCR image is public. No registry credentials are required.
 
