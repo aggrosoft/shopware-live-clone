@@ -81,6 +81,8 @@ docker run -d --name clone-ci-target --network clone-ci \
     "$image"
 wait_healthy clone-ci-target
 test "$(docker exec clone-ci-target php -r '$env = require "/var/lib/shopware-clone/source/.env.local.php"; echo ($env["APP_ENV"] ?? "") . ":" . ($env["APP_DEBUG"] ?? "");')" = 'dev:1'
+test "$(docker exec clone-ci-target sh -c 'find /var/lib/shopware-clone/source -maxdepth 1 -type f -name ".env*" -printf "%f\n" | sort')" = '.env.local.php'
+docker exec clone-ci-target test ! -e /var/lib/shopware-clone/original-config
 docker exec clone-ci-target test -f /var/lib/shopware-clone/source/config/packages/dev/zzzz_clone.yaml
 if docker exec clone-ci-target grep -Eq '^export APP_(ENV|DEBUG)=' /var/lib/shopware-clone/runtime.sh; then
     echo 'runtime.sh must not persist APP_ENV or APP_DEBUG' >&2
