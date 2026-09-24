@@ -29,4 +29,12 @@ $htaccess = clonePublicHtaccess();
 $check(strpos($htaccess, 'RewriteRule ^ index.php [L]') !== false, 'Clone Apache config routes through Shopware.');
 $check(strpos($htaccess, 'X-Forwarded-Proto') !== false, 'Clone Apache config recognizes proxy HTTPS.');
 $check(strpos($htaccess, 'HTTP_HOST') === false, 'Clone Apache config contains no canonical-host redirect.');
+putenv('CLONE_OPENSEARCH_HOST=opensearch-clone-a');
+$check(cloneInternalServiceHost('CLONE_OPENSEARCH_HOST', 'opensearch') === 'opensearch-clone-a', 'Clone-specific service hostname accepted.');
+putenv('CLONE_OPENSEARCH_HOST=bad/host');
+$rejected = false;
+try { cloneInternalServiceHost('CLONE_OPENSEARCH_HOST', 'opensearch'); } catch (RuntimeException $expected) { $rejected = true; }
+$check($rejected, 'Unsafe internal service hostname accepted.');
+putenv('CLONE_OPENSEARCH_HOST');
+$check(cloneInternalServiceHost('CLONE_OPENSEARCH_HOST', 'opensearch') === 'opensearch', 'Internal service hostname fallback preserved.');
 echo "Clone URL configuration tests: OK\n";
