@@ -77,7 +77,8 @@ The GHCR image is public. No registry credentials are required.
 | `SOURCE_SSH_KNOWN_HOSTS` | no | Verified OpenSSH host-key entry; use `[host]:port` for non-standard ports |
 | `SOURCE_SHOP_PATH` | yes | Absolute Shopware project root, not its `public/` directory |
 | `SOURCE_URL` | yes | Exact primary sales-channel URL, including scheme and optional path |
-| `SSH_PASSWORD` | yes | Password assigned to the clone's `dockware` user |
+| `SSH_AUTHORIZED_KEYS_B64` | no | Base64 representation of the shared OpenSSH `authorized_keys` list used by SSHPiper |
+| `SSH_PASSWORD` | no | Password assigned to the clone's `dockware` user when shared public-key authentication is not configured |
 
 `CLONE_URL`, `SERVICE_FQDN_SHOP`, and `SERVICE_FQDN_SHOP_80` are populated by Coolify and
 must not be copied from the live environment. The clone URL must differ from `SOURCE_URL`.
@@ -193,8 +194,28 @@ the external username:
 ssh <clone-fqdn>@sftp.dev.example.com -p 2222
 ```
 
-Authentication uses `SSH_PASSWORD`. The `${COMPOSE_PROJECT_NAME}` label selects Coolify's
-resource network when the container is attached to multiple networks.
+Configure the same project-shared key value used by the Shopware DEV template:
+
+```text
+SSH_AUTHORIZED_KEYS_B64={{project.SSH_AUTHORIZED_KEYS_B64}}
+```
+
+`SSH_AUTHORIZED_KEYS_B64` contains the Base64 representation of a normal OpenSSH
+`authorized_keys` list. It is referenced only from the SSHPiper labels and is not copied
+into the clone container. For example:
+
+```bash
+printf '%s\n' 'ssh-ed25519 AAAA... developer-one' 'ssh-ed25519 AAAA... developer-two' | openssl base64 -A
+```
+
+When `SSH_AUTHORIZED_KEYS_B64` is set, the stock SSHPiper Docker plugin uses its
+public-key Docker-exec bridge and opens `/bin/bash` as the clone's `dockware` user.
+When it is empty, authentication falls back to the clone SSH server and `SSH_PASSWORD`.
+Public-key and password authentication are therefore not offered simultaneously for the
+same clone.
+
+The `${COMPOSE_PROJECT_NAME}` label selects Coolify's resource network when the container
+is attached to multiple networks.
 
 ## Operations
 
