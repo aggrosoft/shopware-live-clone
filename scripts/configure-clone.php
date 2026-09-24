@@ -148,15 +148,7 @@ function configureClone(): void
         throw new RuntimeException('Automatic configuration currently supports Shopware 6.6 and 6.7.');
     }
     $env = databaseEnvironment($root, []);
-    $backup = $data . '/original-config';
-    if (!is_dir($backup)) { mkdir($backup, 0700); }
-    $save = static function (string $path, string $contents) use ($root, $backup): void {
-        if (is_file($path)) {
-            $relative = substr($path, strlen($root) + 1);
-            $destination = $backup . '/' . $relative;
-            if (!is_dir(dirname($destination))) { mkdir(dirname($destination), 0700, true); }
-            if (!is_file($destination)) { copy($path, $destination); }
-        }
+    $save = static function (string $path, string $contents): void {
         if (!is_dir(dirname($path))) { mkdir(dirname($path), 0700, true); }
         if (file_put_contents($path, $contents) === false) { throw new RuntimeException('Cannot write clone configuration.'); }
     };
@@ -271,6 +263,11 @@ function configureClone(): void
         $save($path, $yamlClass::dump($config, 20, 2));
     }
     $env = array_replace($env, $overrides);
+    foreach (glob($root . '/.env*') ?: [] as $path) {
+        if (is_file($path) && !unlink($path)) {
+            throw new RuntimeException('Cannot remove copied source environment file.');
+        }
+    }
     $save($root . '/.env.local.php', "<?php\nreturn " . var_export($env, true) . ";\n");
     $runtimeShell = "#!/bin/bash\n";
     foreach ($overrides as $key => $value) {
