@@ -18,13 +18,16 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: ${APP_DEBUG:-1}
       INTERNAL_STOREFRONT_ORIGIN: http://shop
-      SSH_PASSWORD: ${SSH_PASSWORD:?Set SSH password}
+      SSH_PASSWORD: ${SSH_PASSWORD:-}
     labels:
       - coolify.traefik.middlewares=authentik-forward-auth@file
       - sshpiper.username=${SERVICE_FQDN_SHOP}
       - sshpiper.container_username=dockware
       - sshpiper.port=22
       - sshpiper.network=${COMPOSE_PROJECT_NAME}
+      - sshpiper.authorized_keys=${SSH_AUTHORIZED_KEYS_B64:-}
+      - sshpiper.docker_exec_cmd=${SSH_AUTHORIZED_KEYS_B64:+true}
+      - sshpiper.docker_sshd_cmd=/bin/bash
     volumes:
       - clone_data:/var/lib/shopware-clone
     depends_on:
