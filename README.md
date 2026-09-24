@@ -36,15 +36,8 @@ does not install Composer dependencies or update Shopware and its plugins.
 | `opensearch` | OpenSearch 2.19.4 for storefront and administration search |
 
 MariaDB, Redis, and OpenSearch are only attached to the internal Compose network and do
-not publish host ports. The shop addresses them through clone-specific network aliases so
-service names from another clone cannot collide. OpenSearch uses a 512 MiB Java heap. The
-Docker host must provide `vm.max_map_count >= 262144`.
-
-> [!IMPORTANT]
-> Keep Coolify's **Connect To Predefined Network** option disabled for this stack. When it
-> is enabled, Coolify attaches every Compose service to the shared destination network after
-> startup, including MariaDB, Redis, and OpenSearch. The proxy reaches the public `shop`
-> service through the resource-specific network and does not require this option.
+not publish host ports. OpenSearch uses a 512 MiB Java heap. The Docker host must provide
+`vm.max_map_count >= 262144`.
 
 ## Deploying with Coolify
 
@@ -66,11 +59,10 @@ hosting account. Store the private key only in the Coolify environment configura
 
 1. Create a Docker Compose resource in Coolify.
 2. Use the repository's [`compose.yaml`](compose.yaml).
-3. Under **Configuration > Advanced**, leave **Connect To Predefined Network** disabled.
-4. Assign an HTTPS domain to service `shop` on container port `80`.
-5. Ensure the server-level Traefik middleware `authentik-forward-auth@file` exists; the Compose file applies it to the public clone route by default.
-6. Configure the required environment variables below.
-7. Deploy and follow the `shop` service logs.
+3. Assign an HTTPS domain to service `shop` on container port `80`.
+4. Ensure the server-level Traefik middleware `authentik-forward-auth@file` exists; the Compose file applies it to the public clone route by default.
+5. Configure the required environment variables below.
+6. Deploy and follow the `shop` service logs.
 
 The GHCR image is public. No registry credentials are required.
 
