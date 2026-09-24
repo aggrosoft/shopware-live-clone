@@ -186,6 +186,9 @@ sshpiper.username=${SERVICE_FQDN_SHOP}
 sshpiper.container_username=dockware
 sshpiper.port=22
 sshpiper.network=${COMPOSE_PROJECT_NAME}
+sshpiper.authorized_keys=${SSH_AUTHORIZED_KEYS_B64:-}
+sshpiper.docker_exec_cmd=${SSH_AUTHORIZED_KEYS_B64:+true}
+sshpiper.docker_sshd_cmd=/bin/bash
 ```
 
 With an SSH Piper endpoint at `sftp.dev.example.com:2222`, connect using the clone FQDN as
