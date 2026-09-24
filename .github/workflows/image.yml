@@ -65,7 +65,10 @@ jobs:
           SERVICE_URL_SHOP_80: https://test.example.org
           SERVICE_FQDN_SHOP: test.example.org
           SERVICE_FQDN_SHOP_80: test.example.org
-        run: docker compose config --quiet
+        run: |
+          docker compose config --quiet
+          docker compose config --format json > /tmp/clone-compose.json
+          python3 tests/compose-network-test.py /tmp/clone-compose.json
 
       - uses: docker/setup-buildx-action@v3
 

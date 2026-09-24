@@ -89,6 +89,40 @@ if [[ -z $runtime_app_debug ]]; then
     if [[ $runtime_app_env == dev ]]; then runtime_app_debug=1; else runtime_app_debug=0; fi
 fi
 runtime_env_migrated=0
+
+# Older clone volumes persisted generic dependency hostnames. If Coolify later attached
+# multiple clone stacks to one predefined network, names such as "opensearch" could resolve
+# to another clone. Migrate those local-only values to this clone's unique network aliases.
+clone_search_host=${CLONE_OPENSEARCH_HOST:-opensearch}
+clone_redis_host=${CLONE_REDIS_HOST:-redis}
+[[ $clone_search_host =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || { echo 'Invalid clone OpenSearch host.' >&2; exit 1; }
+[[ $clone_redis_host =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || { echo 'Invalid clone Redis host.' >&2; exit 1; }
+[[ $clone_db_host =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || { echo 'Invalid clone database host.' >&2; exit 1; }
+[[ $clone_db_port =~ ^[0-9]+$ ]] || { echo 'Invalid clone database port.' >&2; exit 1; }
+
+migrate_clone_runtime_value() {
+    local old_value=$1
+    local new_value=$2
+    local path=$3
+    [[ $old_value != "$new_value" && -f $path ]] || return 0
+    if grep -qF -- "$old_value" "$path"; then
+        sed -i "s#${old_value}#${new_value}#g" "$path"
+        runtime_env_migrated=1
+    fi
+}
+
+while IFS= read -r -d '' config_file; do
+    migrate_clone_runtime_value 'http://opensearch:9200' "http://${clone_search_host}:9200" "$config_file"
+    migrate_clone_runtime_value 'redis://redis:6379/' "redis://${clone_redis_host}:6379/" "$config_file"
+    migrate_clone_runtime_value '@database:3306/' "@${clone_db_host}:${clone_db_port}/" "$config_file"
+done < <(find "$root/config" -type f \( -name '*.yaml' -o -name '*.yml' \) -print0)
+
+for runtime_file in "$root/.env.local.php" "$data/runtime.sh" "$data/runtime.json"; do
+    migrate_clone_runtime_value 'http://opensearch:9200' "http://${clone_search_host}:9200" "$runtime_file"
+    migrate_clone_runtime_value 'redis://redis:6379/' "redis://${clone_redis_host}:6379/" "$runtime_file"
+    migrate_clone_runtime_value '@database:3306/' "@${clone_db_host}:${clone_db_port}/" "$runtime_file"
+done
+
 if [[ -f $data/runtime.sh ]] && grep -Eq '^export APP_(ENV|DEBUG)=' "$data/runtime.sh"; then
     sed -i '/^export APP_ENV=/d; /^export APP_DEBUG=/d' "$data/runtime.sh"
     runtime_env_migrated=1
