@@ -128,9 +128,9 @@ The configurator applies the following changes to the copied environment:
 | Scheduled tasks | `queued` and `running` tasks are reset to `scheduled` |
 | Storage and CDN | Standard Flysystem storage becomes local; CDN URLs and the standard Fastly key are removed |
 
-Original configuration files are retained under
-`/var/lib/shopware-clone/original-config` for diagnosis. They may contain production
-secrets and must not be exposed or copied into support tickets without review.
+Copied root-level `.env*` files are removed after their values have been read and
+rewritten. The clone keeps only its generated `.env.local.php`; original live environment
+files and backup copies are not retained.
 
 These rewrites cover standard Shopware and Symfony configuration. Plugin-specific database
 connections, HTTP clients, payment providers, ERP integrations, mail clients, CDN purge
@@ -262,7 +262,7 @@ Each resource owns four volumes:
 
 | Volume | Contents |
 |---|---|
-| `clone_data` | Copied shop, configuration backups, state, and logs |
+| `clone_data` | Copied shop, generated clone configuration, state, and logs |
 | `clone_db` | MariaDB data |
 | `clone_redis` | Redis data |
 | `clone_opensearch` | Search indexes |
