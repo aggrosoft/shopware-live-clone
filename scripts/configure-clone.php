@@ -20,6 +20,15 @@ function clonePublicHtaccess(): string
     return rtrim($contents, "\r\n");
 }
 
+function cloneInternalServiceHost(string $environment, string $fallback): string
+{
+    $host = getenv($environment) ?: $fallback;
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9.-]*$/', $host)) {
+        throw new RuntimeException('Invalid internal clone service host.');
+    }
+    return $host;
+}
+
 function cloneDomainMap(array $rows, string $source, string $target): array
 {
     $source = cloneUrl($source);
@@ -191,16 +200,19 @@ function configureClone(): void
     $lock = json_decode(file_get_contents($root . '/composer.lock'), true, 512, JSON_THROW_ON_ERROR);
     $packages = array_column($lock['packages'], 'version', 'name');
     $engine = 'opensearch';
-    $endpoint = 'http://opensearch:9200';
+    $opensearchHost = cloneInternalServiceHost('CLONE_OPENSEARCH_HOST', 'opensearch');
+    $redisHost = cloneInternalServiceHost('CLONE_REDIS_HOST', 'redis');
+    $endpoint = 'http://' . $opensearchHost . ':9200';
+    $redisEndpointPrefix = 'redis://' . $redisHost . ':6379/';
     $pdo = cloneDatabasePdo();
     $dbVersion = $pdo->query('SELECT VERSION()')->fetchColumn();
     $dbUrl = cloneDatabaseUrl((string) $dbVersion);
     $redisMap = [];
-    $rewrite = static function (string $value) use (&$redisMap, $endpoint, $dbUrl, $root): string {
+    $rewrite = static function (string $value) use (&$redisMap, $redisEndpointPrefix, $dbUrl, $root): string {
         if (preg_match('~^rediss?://~', $value)) {
             if (!isset($redisMap[$value])) {
                 if (count($redisMap) >= 15) { throw new RuntimeException('Too many distinct Redis connections.'); }
-                $redisMap[$value] = 'redis://redis:6379/' . (count($redisMap) + 1);
+                $redisMap[$value] = $redisEndpointPrefix . (count($redisMap) + 1);
             }
             return $redisMap[$value];
         }
@@ -227,7 +239,7 @@ function configureClone(): void
     $overrides = array_replace($storageOverrides, $overrides);
     // Expose rewritten Redis variables to hardcoded ENV references as well.
     foreach ($env as $key => $value) {
-        if (is_string($value) && strpos($value, 'redis://redis:6379/') === 0) { $overrides[$key] = $value; }
+        if (is_string($value) && strpos($value, $redisEndpointPrefix) === 0) { $overrides[$key] = $value; }
     }
     $mapTree = static function ($node) use (&$mapTree, $rewrite) {
         if (is_array($node)) { foreach ($node as $key => $value) { $node[$key] = $mapTree($value); } }
