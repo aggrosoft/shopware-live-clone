@@ -16,6 +16,13 @@ $check(file_get_contents($root . '/files/document.pdf') === 'fixture document');
 $check(!file_exists($root . '/public/sitemap/live.xml'));
 $check($overrides === ['S3_KEY' => '', 'S3_SECRET' => '', 'CDN_URL' => '']);
 $check(glob($data . '/s3-read-*') === []);
+$skipRoot = $data . '/skip-media-shop';
+mkdir($skipRoot);
+$skipOverrides = cloneImportStorage(['shopware' => ['filesystem' => ['public' => $public, 'private' => ['type' => 'local']]]], ['S3_KEY' => 'fixture-key', 'S3_SECRET' => 'fixture-secret'], $skipRoot, $data, false);
+$check(!file_exists($skipRoot . '/public/media/product.svg'));
+$check(!file_exists($skipRoot . '/public/thumbnail/product.svg'));
+$check($skipOverrides === ['S3_KEY' => '', 'S3_SECRET' => '']);
+$check(glob($data . '/s3-read-*') === []);
 foreach (cloneLocalFilesystems('https://clone.example.test') as $name => $storage) {
     $check($storage['type'] === 'local');
     $check(!isset($storage['config']['credentials']));
