@@ -188,16 +188,21 @@ function configureClone(): void
     $lock = json_decode(file_get_contents($root . '/composer.lock'), true, 512, JSON_THROW_ON_ERROR);
     $packages = array_column($lock['packages'], 'version', 'name');
     $engine = 'opensearch';
-    $endpoint = 'http://opensearch:9200';
+    $searchHost = getenv('CLONE_SEARCH_HOST') ?: 'opensearch';
+    $redisHost = getenv('CLONE_REDIS_HOST') ?: 'redis';
+    foreach ([$searchHost, $redisHost] as $host) {
+        if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/', $host)) { throw new RuntimeException('Invalid internal service hostname.'); }
+    }
+    $endpoint = 'http://' . $searchHost . ':9200';
     $pdo = cloneDatabasePdo();
     $dbVersion = $pdo->query('SELECT VERSION()')->fetchColumn();
     $dbUrl = cloneDatabaseUrl((string) $dbVersion);
     $redisMap = [];
-    $rewrite = static function (string $value) use (&$redisMap, $endpoint, $dbUrl, $root): string {
+    $rewrite = static function (string $value) use (&$redisMap, $endpoint, $dbUrl, $root, $redisHost): string {
         if (preg_match('~^rediss?://~', $value)) {
             if (!isset($redisMap[$value])) {
                 if (count($redisMap) >= 15) { throw new RuntimeException('Too many distinct Redis connections.'); }
-                $redisMap[$value] = 'redis://redis:6379/' . (count($redisMap) + 1);
+                $redisMap[$value] = 'redis://' . $redisHost . ':6379/' . (count($redisMap) + 1);
             }
             return $redisMap[$value];
         }
@@ -224,7 +229,7 @@ function configureClone(): void
     $overrides = array_replace($storageOverrides, $overrides);
     // Expose rewritten Redis variables to hardcoded ENV references as well.
     foreach ($env as $key => $value) {
-        if (is_string($value) && strpos($value, 'redis://redis:6379/') === 0) { $overrides[$key] = $value; }
+        if (is_string($value) && strpos($value, 'redis://' . $redisHost . ':6379/') === 0) { $overrides[$key] = $value; }
     }
     $mapTree = static function ($node) use (&$mapTree, $rewrite) {
         if (is_array($node)) { foreach ($node as $key => $value) { $node[$key] = $mapTree($value); } }
