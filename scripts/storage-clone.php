@@ -77,13 +77,15 @@ function cloneCopyS3(array $config, string $destination, string $data, bool $pub
     }
 }
 
-function cloneImportStorage(array $effective, array $env, string $root, string $data): array
+function cloneImportStorage(array $effective, array $env, string $root, string $data, bool $syncMedia = true): array
 {
     $filesystems = $effective['shopware']['filesystem'] ?? [];
     foreach (['public' => 'public', 'private' => 'files'] as $name => $directory) {
         $storage = cloneStorageValue($filesystems[$name] ?? ['type' => 'local'], $env, $root);
         $type = $storage['type'] ?? 'local';
-        if ($type === 'amazon-s3') {
+        if ($type === 'amazon-s3' && $name === 'public' && !$syncMedia) {
+            echo "Skipping public S3 media and thumbnails (CLONE_SYNC_MEDIA=false).\n";
+        } elseif ($type === 'amazon-s3') {
             echo "Copying $name S3 storage into the clone (read-only source access)...\n";
             $config = $storage['config'] ?? [];
             if (empty($config['credentials']) && !empty($env['AWS_ACCESS_KEY_ID']) && !empty($env['AWS_SECRET_ACCESS_KEY'])) {
