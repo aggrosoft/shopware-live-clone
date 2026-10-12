@@ -99,10 +99,19 @@ cp "$clone_tmp/result.json" "$clone_data/source-report.json"
 printf '%s\n' '[2/7] Copying files: scanning file list, then transferring (ETA covers this phase only)...'
 # Materialize source links so absolute hosting paths work in the clone.
 copy_status=0
+media_excludes=()
+case "${CLONE_SYNC_MEDIA:-true}" in
+    true|1) ;;
+    false|0) media_excludes=(--exclude='/public/media/' --exclude='/public/thumbnail/') ;;
+    *) clone_fail 'CLONE_SYNC_MEDIA must be true/false or 1/0.' ;;
+esac
+if (( ${#media_excludes[@]} )); then
+    printf '%s\n' '[2/7] Skipping media and thumbnails (CLONE_SYNC_MEDIA=false).'
+fi
 LC_ALL=C rsync --copy-links --rsync-path="LC_ALL=C rsync" --info=progress2,name0 --no-inc-recursive --outbuf=L --archive --no-owner --no-group --protect-args \
     --chmod=u+rwX,go-rwx --timeout=120 \
     --exclude='/.git/' --exclude='/var/cache/' --exclude='/var/log/' --exclude='/var/sessions/' \
-    --exclude='/node_modules/' \
+    --exclude='/node_modules/' "${media_excludes[@]}" \
     -e "ssh -F $clone_tmp/config" \
     "clone-source:${SOURCE_SHOP_PATH%/}/" "$clone_source/" \
     2> "$clone_tmp/error" | php "$script_dir/progress.php" rsync "[2/7] Copying files" || copy_status=$?
