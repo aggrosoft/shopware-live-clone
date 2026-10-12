@@ -15,9 +15,9 @@ services:
       SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:-}
       SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
       CLONE_SYNC_MEDIA: ${CLONE_SYNC_MEDIA:-true}
-      CLONE_DATABASE_HOST: db-${SERVICE_HEX_32_CLONEIDENT}
-      CLONE_SEARCH_HOST: search-${SERVICE_HEX_32_CLONEIDENT}
-      CLONE_REDIS_HOST: cache-${SERVICE_HEX_32_CLONEIDENT}
+      CLONE_DATABASE_HOST: db-${COMPOSE_PROJECT_NAME}
+      CLONE_SEARCH_HOST: search-${COMPOSE_PROJECT_NAME}
+      CLONE_REDIS_HOST: cache-${COMPOSE_PROJECT_NAME}
       APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: ${APP_DEBUG:-1}
       INTERNAL_STOREFRONT_ORIGIN: http://shop
@@ -39,7 +39,8 @@ services:
     restart: unless-stopped
     networks:
       backend:
-        aliases: [db-${SERVICE_HEX_32_CLONEIDENT}]
+        aliases:
+          - "db-${COMPOSE_PROJECT_NAME}"
     environment:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_ROOT_HOST: '%'
@@ -57,7 +58,8 @@ services:
     restart: unless-stopped
     networks:
       backend:
-        aliases: [cache-${SERVICE_HEX_32_CLONEIDENT}]
+        aliases:
+          - "cache-${COMPOSE_PROJECT_NAME}"
     command: [redis-server, --appendonly, 'yes']
     volumes:
       - clone_redis:/data
@@ -72,7 +74,8 @@ services:
     restart: unless-stopped
     networks:
       backend:
-        aliases: [search-${SERVICE_HEX_32_CLONEIDENT}]
+        aliases:
+          - "search-${COMPOSE_PROJECT_NAME}"
     environment:
       discovery.type: single-node
       DISABLE_SECURITY_PLUGIN: 'true'
