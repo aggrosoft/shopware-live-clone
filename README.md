@@ -35,7 +35,7 @@ does not install Composer dependencies or update Shopware and its plugins.
 | `redis` | Redis 7.4 for copied Redis connections |
 | `opensearch` | OpenSearch 2.19.4 for storefront and administration search |
 
-The runtime assigns stable, per-clone DNS aliases to MariaDB, Redis and OpenSearch (using Coolify's generated `SERVICE_HEX_32_CLONEIDENT` value). This prevents generic service-name collisions when several clones share Coolify's cross-app network. Keep the shop attached to the shared Coolify network to allow communication with other dev applications. The dedicated internal services still use the clone's backend network.
+The runtime assigns stable, per-clone DNS aliases to MariaDB, Redis and OpenSearch (using Coolify's generated `COMPOSE_PROJECT_NAME` value). This prevents generic service-name collisions when several clones share Coolify's cross-app network. Keep the shop attached to the shared Coolify network to allow communication with other dev applications. The dedicated internal services still use the clone's backend network.
 
 MariaDB, Redis, and OpenSearch are only attached to the internal Compose network and do
 not publish host ports. OpenSearch uses a 512 MiB Java heap. The Docker host must provide
