@@ -15,7 +15,9 @@ services:
       SOURCE_SSH_KNOWN_HOSTS: ${SOURCE_SSH_KNOWN_HOSTS:-}
       SOURCE_SHOP_PATH: ${SOURCE_SHOP_PATH:?Set absolute project directory}
       CLONE_SYNC_MEDIA: ${CLONE_SYNC_MEDIA:-true}
-      CLONE_DATABASE_HOST: database
+      CLONE_DATABASE_HOST: db-${SERVICE_HEX_32_CLONEIDENT}
+      CLONE_SEARCH_HOST: search-${SERVICE_HEX_32_CLONEIDENT}
+      CLONE_REDIS_HOST: cache-${SERVICE_HEX_32_CLONEIDENT}
       APP_ENV: ${APP_ENV:-dev}
       APP_DEBUG: ${APP_DEBUG:-1}
       INTERNAL_STOREFRONT_ORIGIN: http://shop
@@ -35,7 +37,9 @@ services:
   database:
     image: mariadb:11.4
     restart: unless-stopped
-    networks: [backend]
+    networks:
+      backend:
+        aliases: [db-${SERVICE_HEX_32_CLONEIDENT}]
     environment:
       MARIADB_ROOT_PASSWORD: root
       MARIADB_ROOT_HOST: '%'
@@ -51,7 +55,9 @@ services:
   redis:
     image: redis:7.4
     restart: unless-stopped
-    networks: [backend]
+    networks:
+      backend:
+        aliases: [cache-${SERVICE_HEX_32_CLONEIDENT}]
     command: [redis-server, --appendonly, 'yes']
     volumes:
       - clone_redis:/data
@@ -64,7 +70,9 @@ services:
   opensearch:
     image: opensearchproject/opensearch:2.19.4
     restart: unless-stopped
-    networks: [backend]
+    networks:
+      backend:
+        aliases: [search-${SERVICE_HEX_32_CLONEIDENT}]
     environment:
       discovery.type: single-node
       DISABLE_SECURITY_PLUGIN: 'true'
