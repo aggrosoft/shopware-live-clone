@@ -77,6 +77,7 @@ The GHCR image is public. No registry credentials are required.
 | `SOURCE_SSH_KNOWN_HOSTS` | no | Verified OpenSSH host-key entry; use `[host]:port` for non-standard ports |
 | `SOURCE_SHOP_PATH` | yes | Absolute Shopware project root, not its `public/` directory |
 | `SOURCE_URL` | yes | Exact primary sales-channel URL, including scheme and optional path |
+| `CLONE_SYNC_MEDIA` | no | `true` (default) copies media and thumbnails; `false` skips them for faster, smaller clones |
 
 `CLONE_URL`, `SERVICE_FQDN_SHOP`, and `SERVICE_FQDN_SHOP_80` are populated by Coolify and
 must not be copied from the live environment. The clone URL must differ from `SOURCE_URL`.
@@ -143,6 +144,8 @@ endpoint, prefix, and credentials from the copied Shopware configuration. It use
 
 - `media/` and `thumbnail/` from public storage
 - the complete private storage
+
+Set `CLONE_SYNC_MEDIA=false` in Coolify before the first deployment to skip `public/media/` and `public/thumbnail/` in the SSH file copy and the public S3 download. Private storage, database, plugins and other files still import normally. Product images will be missing. Changing the flag after the initial import will not reimport media; create a fresh clone to change the selection.
 
 The source operation uses LIST, HEAD, and GET requests. It does not sync, move, overwrite,
 or delete source objects. Temporary S3 credentials are removed after the copy.
