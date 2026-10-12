@@ -172,7 +172,12 @@ function configureClone(): void
             $effective = array_replace_recursive($effective, $parsed, $parsed['when@prod'] ?? []);
         }
     }
-    $storageOverrides = cloneImportStorage($effective, $env, $root, $data);
+    $syncMediaValue = getenv('CLONE_SYNC_MEDIA');
+    $syncMediaValue = $syncMediaValue === false ? 'true' : $syncMediaValue;
+    if (!in_array($syncMediaValue, ['true', 'false', '1', '0'], true)) {
+        throw new RuntimeException('CLONE_SYNC_MEDIA must be true/false or 1/0.');
+    }
+    $storageOverrides = cloneImportStorage($effective, $env, $root, $data, in_array($syncMediaValue, ['true', '1'], true));
     $bool = static function ($value) use ($env): bool {
         if (is_string($value) && preg_match('/^%env\((?:bool:)?([A-Z0-9_]+)\)%$/', $value, $m)) { $value = $env[$m[1]] ?? ''; }
         if (!in_array($value, [true, false, 1, 0, '1', '0', 'true', 'false', '', null], true)) { throw new RuntimeException('Unresolved search enable flag.'); }
